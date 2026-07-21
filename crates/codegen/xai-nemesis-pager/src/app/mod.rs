@@ -445,6 +445,17 @@ pub async fn run(
     >,
 ) -> anyhow::Result<bool> {
     xai_tty_utils::redirect_native_stderr();
+    
+    // NEMESIS: Initialize provider configuration from /auth command
+    // This must happen BEFORE config loading so env vars are set
+    if let Some(provider_config) = xai_nemesis_shell::nemesis_provider::initialize_nemesis_provider() {
+        tracing::info!(
+            provider = %provider_config.provider,
+            display_name = %provider_config.display_name(),
+            "NEMESIS provider loaded from auth_config.json"
+        );
+    }
+    
     let screen_mode_override = screen_mode_relaunch::take_screen_mode_env_override();
     let cancel = CancellationToken::new();
     let startup_start = std::time::Instant::now();

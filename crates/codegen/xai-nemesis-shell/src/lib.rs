@@ -30,6 +30,7 @@ pub mod instrumentation;
 pub mod leader;
 pub mod managed_config;
 pub mod mcp_doctor;
+pub mod nemesis_provider;
 pub use xai_nemesis_models as models;
 pub mod plugin;
 pub mod relay;

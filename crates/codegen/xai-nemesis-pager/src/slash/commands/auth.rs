@@ -9,6 +9,7 @@
 
 use crate::app::actions::Action;
 use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand};
+use xai_nemesis_shell::nemesis_provider::{NemesisProviderConfig, initialize_nemesis_provider};
 
 /// Available AI providers for NEMESIS Agent
 #[derive(Debug, Clone)]
@@ -19,7 +20,7 @@ pub enum AuthProvider {
     NvidiaNim,
     /// Groq (API key)
     Groq,
-    /// Fireworks AI (API key)
+    /// Fireworks (API key)
     Fireworks,
     /// Custom OpenAI-compatible endpoint
     Custom,
@@ -56,6 +57,17 @@ impl AuthProvider {
             Self::Groq => Some("https://api.groq.com/openai/v1"),
             Self::Fireworks => Some("https://api.fireworks.ai/inference/v1"),
             Self::Custom => None,
+        }
+    }
+
+    /// Provider ID string for storage
+    pub fn id(&self) -> &'static str {
+        match self {
+            Self::Grok => "grok",
+            Self::NvidiaNim => "nvidia-nim",
+            Self::Groq => "groq",
+            Self::Fireworks => "fireworks",
+            Self::Custom => "custom",
         }
     }
 
@@ -154,37 +166,42 @@ impl SlashCommand for AuthCommand {
 impl AuthCommand {
     /// Show current auth configuration status and usage help
     fn show_status_and_help(&self) -> CommandResult {
-        let config = Self::load_current_config();
+        // Load current config using the shared module
+        let config = NemesisProviderConfig::load();
         
-        let status = match config.as_object() {
-            Some(obj) => {
-                let provider = obj.get("provider")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("None configured");
-                
-                let has_key = obj.get("api_key")
-                    .map(|v| if v.as_str().map_or(false, |s| !s.is_empty()) { "Yes" } else { "No" })
-                    .unwrap_or("No");
-                
+        let status = match config {
+            Some(ref cfg) if cfg.is_configured() => {
                 format!(
-                    "Current Configuration:\n  Provider: {provider}\n  API Key:   {has_key}\n"
+                    "Current Configuration:\n  Provider: {}\n  Base URL:  {}\n  API Key:   {}…{}\n",
+                    cfg.display_name(),
+                    if cfg.base_url.is_empty() { "(default)" } else { &cfg.base_url },
+                    &cfg.api_key[..std::cmp::min(8, cfg.api_key.len())],
+                    if cfg.configured_at.is_some() { 
+                        format!("\n  Configured: {}", cfg.configured_as_deref().unwrap_or("unknown")) 
+                    } else { 
+                        String::new() 
+                    }
                 )
             }
             None => "No configuration found.\n".to_string(),
+            _ => "Configuration exists but is incomplete.\n".to_string(),
         };
 
         CommandResult::Message(format!(
-            "{status}\nUsage:\n\
+            "{status}\n\
+            Usage:\n\
             /auth <provider> [api_key] [base_url]\n\
             \n\
             Providers:\n{}\n\
             \n\
             Examples:\n\
             /auth grok\n\
-            /auth nvidia-nim nvi_xxxxxxxxxxxx\n\
+            /auth nvidia-nim nvapi-xxxxxxxxxxxx\n\
+            /auth groq gsk_yyyyyyyyyyyyyyyy\n\
             /auth custom sk-xxx https://my-api.example.com/v1\n\
             \n\
-            Use Tab after '/auth ' to see available providers.",
+            Note: After configuring a provider, restart NEMESIS or start\n\
+            a new session for changes to take full effect.",
             Self::format_provider_list()
         ))
     }
@@ -198,7 +215,7 @@ impl AuthCommand {
             .join("\n")
     }
 
-    /// Configure the selected provider
+    /// Configure the selected provider and save to disk
     fn configure_provider(
         &self,
         provider: AuthProvider,
@@ -208,89 +225,87 @@ impl AuthCommand {
         match provider {
             AuthProvider::Grok => {
                 // For Grok, trigger the OAuth login flow
+                // Clear any custom provider config first
+                let _ = std::fs::remove_file(NemesisProviderConfig::config_path());
+                
                 CommandResult::Action(Action::Login)
             }
-            AuthProvider::NvidiaNim => {
-                self.save_api_key_provider("nvidia-nim", api_key, base_url, "https://integrate.api.nvidia.com/v1")
-            }
-            AuthProvider::Groq => {
-                self.save_api_key_provider("groq", api_key, base_url, "https://api.groq.com/openai/v1")
-            }
-            AuthProvider::Fireworks => {
-                self.save_api_key_provider("fireworks", api_key, base_url, "https://api.fireworks.ai/inference/v1")
-            }
-            AuthProvider::Custom => {
-                // Custom requires both API key and base URL
-                match (&api_key, &base_url) {
-                    (Some(key), Some(url)) => {
-                        if url.is_empty() || key.is_empty() {
-                            return CommandResult::Error(
-                                "Custom provider requires both API key and base URL.\n\
-                                Usage: /auth custom <api_key> <base_url>".to_string()
-                            );
-                        }
-                        self.save_api_key_provider("custom", api_key, base_url, "")
-                    }
-                    (None, _) => {
-                        CommandResult::Error(
-                            "Custom provider requires API key and base URL.\n\
-                            Usage: /auth custom <api_key> <base_url>\n\
-                            Example: /auth custom sk-xxx https://api.example.com/v1".to_string()
-                        )
-                    }
-                    (_, None) => {
-                        CommandResult::Error(
-                            "Custom provider requires a base URL.\n\
-                            Usage: /auth custom <api_key> <base_url>\n\
-                            Example: /auth custom sk-xxx https://api.example.com/v1".to_string()
-                        )
-                    }
-                }
+            other_provider => {
+                self.save_api_key_provider(other_provider, api_key, base_url)
             }
         }
     }
 
-    /// Save API key-based provider configuration
+    /// Save API key-based provider configuration using the shared module
     fn save_api_key_provider(
         &self,
-        provider_id: &str,
+        provider: AuthProvider,
         api_key: Option<String>,
         base_url: Option<String>,
-        default_url: &str,
     ) -> CommandResult {
         // Validate API key is present
         let api_key = match api_key {
             Some(key) if !key.is_empty() => key,
             _ => {
                 return CommandResult::Error(format!(
-                    "{provider_id} requires an API key.\n\
-                    Usage: /auth {provider_id} <api_key>\n\
+                    "{} requires an API key.\n\
+                    Usage: /auth {} <api_key>\n\
                     \n\
                     Get your API key from: {}",
-                    Self::get_provider_docs_url(provider_id)
+                    provider.display_name(),
+                    provider.id(),
+                    Self::get_provider_docs_url(provider.id())
                 ));
             }
         };
 
-        // Determine base URL
-        let base_url = base_url
+        // Determine base URL with default fallback
+        let resolved_base_url = base_url
             .filter(|u| !u.is_empty())
-            .unwrap_or_else(|| default_url.to_string());
+            .or_else(|| provider.default_base_url().map(|s| s.to_string()))
+            .unwrap_or_default();
 
-        // Save configuration
-        match Self::save_config(provider_id, &api_key, &base_url) {
-            Ok(()) => CommandResult::Message(format!(
-                "✓ Provider configured successfully!\n\
-                \n\
-                Provider:  {}\n\
-                Base URL:  {}\n\
-                API Key:   {}…\n\
-                \n\
-                You can now start chatting. Use /model to select a model.",
-                provider_id,
-                base_url,
-                &api_key[..std::cmp::min(8, api_key.len())]
-            )),
+        // Create config using the shared module
+        let config = NemesisProviderConfig {
+            provider: provider.id().to_string(),
+            api_key: api_key.clone(),
+            base_url: resolved_base_url.clone(),
+            configured_at: Some(chrono::Utc::now().to_rfc3339()),
+        };
+
+        // Save to disk
+        match config.save() {
+            Ok(()) => {
+                // Apply to environment immediately
+                config.apply_to_environment();
+                
+                // Get available models for this provider
+                let models = config.get_default_models();
+                let models_info = if models.is_empty() {
+                    String::new()
+                } else {
+                    format!("\n\nAvailable models:\n{}", 
+                        models.iter().map(|m| format!("  • {m}")).collect::<Vec<_>>().join("\n"))
+                };
+                
+                CommandResult::Message(format!(
+                    "✓ Provider configured successfully!\n\
+                    \n\
+                    Provider:  {}\n\
+                    Base URL:  {}\n\
+                    API Key:   {}…{}\n\
+                    \n\
+                    Configuration saved to ~/.nemesis/auth_config.json\n\
+                    Environment variables updated.{}
+                    \n\
+                    💡 Start a new session or send a message to use this provider.",
+                    provider.display_name(),
+                    if resolved_base_url.is_empty() { "(default)" } else { &resolved_base_url },
+                    &api_key[..std::cmp::min(8, api_key.len())],
+                    models_info,
+                    if !models.is_empty() { "\n\nUse /model <name> to select a model." } else { "" }
+                ))
+            }
             Err(e) => CommandResult::Error(format!("Failed to save configuration: {e}")),
         }
     }
@@ -304,58 +319,6 @@ impl AuthCommand {
             "custom" => "your API provider's documentation",
             _ => "the provider's website",
         }
-    }
-
-    /// Load current configuration from disk
-    fn load_current_config() -> serde_json::Value {
-        let config_path = Self::config_path();
-        
-        if !config_path.exists() {
-            return serde_json::json!({});
-        }
-
-        std::fs::read_to_string(&config_path)
-            .ok()
-            .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or(serde_json::json!({}))
-    }
-
-    /// Save provider configuration to disk
-    fn save_config(provider_id: &str, api_key: &str, base_url: &str) -> anyhow::Result<()> {
-        let config = Self::load_current_config();
-        
-        let mut new_config = config.clone();
-        if let Some(obj) = new_config.as_object_mut() {
-            obj.insert("provider".into(), serde_json::json!(provider_id));
-            obj.insert("api_key".into(), serde_json::json!(api_key));
-            obj.insert("base_url".into(), serde_json::json!(base_url));
-            obj.insert("configured_at".into(), serde_json::json!(
-                chrono::Utc::now().to_rfc3339()
-            ));
-        }
-
-        let config_path = Self::config_path();
-        
-        // Ensure parent directory exists
-        if let Some(parent) = config_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        std::fs::write(&config_path, serde_json::to_string_pretty(&new_config)?)?;
-        
-        tracing::info!(provider = provider_id, "Auth configuration saved");
-        
-        Ok(())
-    }
-
-    /// Get path to the auth configuration file
-    fn config_path() -> std::path::PathBuf {
-        // Use ~/.nemesis/auth_config.json
-        let nemesis_home = dirs::home_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join(".nemesis");
-        
-        nemesis_home.join("auth_config.json")
     }
 }
 
@@ -470,5 +433,14 @@ mod tests {
             }
             other => panic!("Expected Error, got: {:?}", other),
         }
+    }
+    
+    #[test]
+    fn test_provider_ids() {
+        assert_eq!(AuthProvider::Grok.id(), "grok");
+        assert_eq!(AuthProvider::NvidiaNim.id(), "nvidia-nim");
+        assert_eq!(AuthProvider::Groq.id(), "groq");
+        assert_eq!(AuthProvider::Fireworks.id(), "fireworks");
+        assert_eq!(AuthProvider::Custom.id(), "custom");
     }
 }
