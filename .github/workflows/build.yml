@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: Build NEMESIS TUI (Legacy CPU Compatible)
+    name: Build NEMESIS TUI (Core 2 Duo / antiX)
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -25,18 +25,20 @@ jobs:
             libprotobuf-dev \
             protobuf-compiler \
             git \
-            curl \
-            musl-tools \
-            musl-dev
+            curl
 
       - name: Install dotslash (required for protoc)
         run: cargo install dotslash
 
-      - name: Install Rust toolchain with musl target
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-          targets: x86_64-unknown-linux-musl
+
+      - name: Add musl target for static linking
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get install -y musl-tools musl-dev
 
       - name: Configure Rust cache
         uses: swatinem/rust-cache@v2
@@ -45,7 +47,7 @@ jobs:
 
       - name: Build NEMESIS (Core 2 Duo / antiX compatible)
         env:
-          # Core 2 Duo compatible: no AVX/AVX2, SSE3/SSSE3 only
+          # Core 2 Duo compatible: x86-64 with SSE3/SSSE3, no AVX
           RUSTFLAGS: "-C target-cpu=x86-64 -C target-feature=+sse3,+ssse3,-avx,-avx2"
           PROTOC: "protoc --experimental_allow_proto3_optional"
           CC_x86_64_unknown_linux_musl: "musl-gcc"
@@ -57,18 +59,20 @@ jobs:
         run: |
           chmod +x target/x86_64-unknown-linux-musl/release/nemesis
           ls -lh target/x86_64-unknown-linux-musl/release/nemesis
-          ./target/x86_64-unknown-linux-musl/release/nemesis --version || echo "Version check done"
           
           echo "=== Binary Info ==="
           file target/x86_64-unknown-linux-musl/release/nemesis
           
-          echo "=== Required Libraries ==="
-          ldd target/x86_64-unknown-linux-musl/release/nemesis 2>&1 || echo "Static linking OK"
+          echo "=== Version ==="
+          ./target/x86_64-unknown-linux-musl/release/nemesis --version || echo "Version check done"
+          
+          echo "=== Static Linking Check ==="
+          ldd target/x86_64-unknown-linux-musl/release/nemesis 2>&1 || echo "✅ Statically linked (no glibc dependency)"
 
       - name: Upload NEMESIS binary
         uses: actions/upload-artifact@v4
         with:
-          name: nemesis-agent-core2duo-linux
+          name: nemesis-agent-core2duo-antix
           path: target/x86_64-unknown-linux-musl/release/nemesis
           retention-days: 30
 
@@ -82,10 +86,10 @@ jobs:
           echo "**Linking:** Static (musl) - No glibc dependency" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Compatible Hardware:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Intel Core 2 Duo / Core 2 Quad" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Intel Core 2 Duo / Core 2 Quad (2006+)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ AMD Athlon 64 X2 / Phenom" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Any x86_64 CPU (2006+)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ antiX Linux, Debian, Ubuntu, etc." >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Any x86_64 CPU without AVX" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ antiX Linux, Debian stable, etc." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Usage:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
