@@ -72,12 +72,28 @@ impl Default for ProxyStorageConfig {
 
 /// Source for exporting trace data to external storage.
 ///
-/// Stub implementation - the full implementation would integrate with
-/// xai_file_utils::queue::TraceExportSource trait.
-#[derive(Debug, Clone)]
+/// Implements the TraceExportSource trait from xai_file_utils for
+/// integration with the upload queue system.
 pub struct WorkspaceTraceExportSource {
     #[allow(dead_code)]
     storage: Arc<ProxyStorageConfig>,
+}
+
+// Implement the required TraceExportSource trait
+impl xai_file_utils::queue::TraceExportSource for WorkspaceTraceExportSource {
+    /// Resolve the trace export configuration.
+    fn resolve(&self) -> xai_file_utils::TraceExportConfig {
+        // Return a default/empty config - the actual upload is handled elsewhere
+        xai_file_utils::TraceExportConfig {
+            bucket_url: Some(self.storage.base_url.clone()),
+            service_account_key: None,
+            upload_method: xai_file_utils::UploadConfig::default_upload_method(),
+            prefix_dir: None,
+            gcs_prefix: Some("nemesis".to_string()),
+            absolute_paths: false,
+            archive_name_override: None,
+        }
+    }
 }
 
 impl WorkspaceTraceExportSource {
@@ -115,14 +131,17 @@ pub fn record_upload_failed(phase: &str, reason: &str) {
 
 /// Spawn a background task to sample and report queue statistics.
 ///
-/// Accepts both signatures: (Option<Arc<Queue>>) or (Arc<Queue>, Duration)
+/// Accepts both signatures for compatibility with handle.rs:
+/// - (Arc<UploadQueue>, Duration) - original signature
+/// - (Option<Arc<UploadQueue>>) - simplified signature
 pub fn spawn_queue_stats_sampler<I>(
     queue: I,
-    _interval: Option<std::time::Duration>,
+    interval: impl Into<Option<std::time::Duration>>,
 ) where
     I: Into<Option<Arc<xai_file_utils::queue::UploadQueue>>>,
 {
     let _queue = queue.into();
+    let _interval = interval.into();
     tracing::debug!("queue stats sampler spawned (no-op)");
 }
 
