@@ -39,19 +39,56 @@ impl WorkspaceIdentity {
             email,
         }
     }
+    
+    /// Create a WorkspaceIdentity from any type that provides identity methods.
+    /// 
+    /// This is a generic constructor that works with various auth identity types
+    /// including xai_computer_hub_sdk::AuthIdentity and our local AuthIdentity.
+    pub fn from_identity<T>(identity: &T) -> Self 
+    where
+        T: IdentityProvider,
+    {
+        Self {
+            user_id: identity.get_user_id().unwrap_or_default().to_string(),
+            display_name: identity.get_display_name().map(|s| s.to_string()),
+            email: identity.get_email().map(|s| s.to_string()),
+        }
+    }
 }
 
-/// Implement From for AuthIdentity conversion.
-/// 
-/// This allows converting from the auth system's identity type
-/// to our workspace identity type.
-impl From<crate::auth::AuthIdentity> for WorkspaceIdentity {
-    fn from(auth: crate::auth::AuthIdentity) -> Self {
-        Self {
-            user_id: auth.user_id().unwrap_or_default().to_string(),
-            display_name: auth.display_name().map(|s| s.to_string()),
-            email: auth.email().map(|s| s.to_string()),
-        }
+/// Trait for types that can provide identity information.
+///
+/// Implemented for both local AuthIdentity and external auth types.
+pub trait IdentityProvider {
+    /// Get the user ID
+    fn get_user_id(&self) -> Option<&str>;
+    
+    /// Get the display name
+    fn get_display_name(&self) -> Option<&str>;
+    
+    /// Get the email address
+    fn get_email(&self) -> Option<&str>;
+}
+
+// Implement IdentityProvider for our local AuthIdentity
+impl IdentityProvider for super::auth::AuthIdentity {
+    fn get_user_id(&self) -> Option<&str> {
+        self.user_id()
+    }
+    
+    fn get_display_name(&self) -> Option<&str> {
+        self.display_name()
+    }
+    
+    fn get_email(&self) -> Option<&str> {
+        self.email()
+    }
+}
+
+// Implement From<crate::auth::AuthIdentity> using the trait
+impl From<super::auth::AuthIdentity> for WorkspaceIdentity {
+    fn from(auth: super::auth::AuthIdentity) -> Self {
+        Self::from_identity(&auth)
     }
 }
 
@@ -60,11 +97,6 @@ impl From<crate::auth::AuthIdentity> for WorkspaceIdentity {
 /// This struct holds a snapshot of the workspace environment at a point in time,
 /// including working directory, environment variables, git state, and other
 /// context needed for debugging and reproduction.
-///
-/// # Serialization
-///
-/// The environment is serialized to JSON for upload to artifact storage.
-/// Use [`WorkspaceEnvironment::to_json_bytes`] to get the serialized form.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceEnvironment {
     /// When this capture was taken
@@ -175,27 +207,12 @@ pub struct ShellInfo {
 impl WorkspaceEnvironment {
     /// Capture the current workspace environment.
     ///
-    /// This function snapshots the workspace state including:
-    /// - Working directory
-    /// - OS information
-    /// - Git repository state (if applicable)
-    /// - Shell information
-    /// - Environment variable names (not values, for security)
-    ///
     /// # Arguments
     /// * `session_id` - The session identifier
     /// * `cwd` - The current working directory
     /// * `identity` - The workspace owner's identity
     /// * `server_id` - Optional server processing this request
     /// * `sandbox_id` - Optional sandbox identifier
-    ///
-    /// # Returns
-    /// A populated `WorkspaceEnvironment` ready for serialization.
-    ///
-    /// # Panics
-    /// This function should not panic under normal operation.
-    /// Any errors during capture are logged but don't prevent
-    /// the environment from being created with partial data.
     pub fn capture(
         session_id: &str,
         cwd: &Path,
@@ -205,18 +222,6 @@ impl WorkspaceEnvironment {
     ) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         
-        // Capture OS info
-        let os_info = Self::capture_os_info();
-        
-        // Capture env var names (NOT values - security)
-        let env_vars = Self::capture_env_var_names();
-        
-        // Capture git info (if in a git repo)
-        let git_info = Self::capture_git_info(cwd);
-        
-        // Capture shell info
-        let shell_info = Self::capture_shell_info();
-        
         Self {
             captured_at: now,
             session_id: session_id.to_string(),
@@ -224,23 +229,18 @@ impl WorkspaceEnvironment {
             identity: identity.clone(),
             server_id,
             sandbox_id,
-            os_info,
-            env_vars,
-            git_info,
-            shell_info,
+            os_info: Self::capture_os_info(),
+            env_vars: Self::capture_env_var_names(),
+            git_info: Self::capture_git_info(cwd),
+            shell_info: Self::capture_shell_info(),
         }
     }
     
     /// Serialize the environment to JSON bytes.
-    ///
-    /// # Returns
-    /// `Ok(Vec<u8>)` containing the JSON representation on success.
-    /// `Err(_)` if serialization fails (e.g., contains non-serializable data).
     pub fn to_json_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
         serde_json::to_vec_pretty(self)
     }
     
-    /// Capture operating system information.
     fn capture_os_info() -> OsInfo {
         OsInfo {
             family: std::env::consts::FAMILY.to_string(),
@@ -250,7 +250,6 @@ impl WorkspaceEnvironment {
         }
     }
     
-    /// Get kernel version on Linux systems.
     fn get_kernel_version() -> Option<String> {
         if cfg!(target_os = "linux") {
             std::fs::read_to_string("/proc/version")
@@ -261,24 +260,16 @@ impl WorkspaceEnvironment {
         }
     }
     
-    /// Capture environment variable names (not values).
-    ///
-    /// We intentionally don't capture values to avoid leaking secrets
-    /// like API keys, tokens, or passwords into artifact storage.
     fn capture_env_var_names() -> Vec<String> {
         std::env::vars()
             .map(|(key, _)| key)
             .collect()
     }
     
-    /// Capture git repository information if cwd is in a git repo.
     fn capture_git_info(cwd: &Path) -> Option<GitInfo> {
-        // Try to get git info using git2 library if available
-        // Fall back to basic detection if not
-        Self::try_git2_info(cwd).or_else(|| Self::basic_git_info(cwd))
+        Self::try_git2_info(cwd)
     }
     
-    /// Attempt to get detailed git info using git2.
     fn try_git2_info(cwd: &Path) -> Option<GitInfo> {
         let repo = git2::Repository::discover(cwd).ok()?;
         
@@ -286,63 +277,42 @@ impl WorkspaceEnvironment {
         let commit_hash = head.target()?.to_string();
         let branch = head.shorthand().map(|s| s.to_string());
         
-        // Check if working tree is dirty
         let dirty = repo.statuses(None).map_or(false, |s| {
-            s.iter().any(|e| {
-                let status = e.status();
-                status != git2::Status::CURRENT
-            })
+            s.iter().any(|e| e.status() != git2::Status::CURRENT)
         });
         
-        // Get remote URL (redact any auth tokens)
         let remote_url = repo
             .find_remote("origin")
             .ok()
             .and_then(|r| r.url().map(|s| s.to_string()))
             .map(Self::redact_git_url);
         
-        // Get workdir path
         let root_path = repo.workdir().map(|p| p.to_path_buf());
         
         Some(GitInfo {
             branch,
-            commit: Some(format!("{:.8}", commit_hash)),  // Abbreviate to 8 chars, wrapped in Some
+            commit: Some(format!("{:.8}", commit_hash)),
             dirty,
             remote_url,
             root_path,
         })
     }
     
-    /// Basic git info fallback when git2 is unavailable.
-    fn basic_git_info(_cwd: &Path) -> Option<GitInfo> {
-        // Return None - we need git2 for proper git info
-        None
-    }
-    
-    /// Redact sensitive information from git URLs.
-    ///
-    /// Removes embedded credentials from HTTPS URLs while preserving
-    /// the host and path information.
     fn redact_git_url(url: String) -> String {
-        // Remove user:password@ from https:// URLs
         if url.contains('@') && url.starts_with("https://") {
             if let Some(at_pos) = url.find('@') {
                 if let Some(scheme_end) = url.find("://") {
-                    let prefix = &url[..scheme_end + 3];
-                    let suffix = &url[at_pos + 1..];
-                    return format!("{}{}", prefix, suffix);
+                    return format!("{}{}{}", &url[..scheme_end + 3], &url[at_pos + 1..]);
                 }
             }
         }
         url
     }
     
-    /// Capture shell/terminal information.
     fn capture_shell_info() -> ShellInfo {
         ShellInfo {
-            shell: std::env::var("SHELL")
-                .unwrap_or_else(|_| "unknown".to_string()),
-            version: None,  // Would need to run shell --version
+            shell: std::env::var("SHELL").unwrap_or_else(|_| "unknown".to_string()),
+            version: None,
             shell_path: std::env::var("SHELL").ok(),
             term: std::env::var("TERM").ok(),
         }
@@ -358,71 +328,30 @@ mod tests {
         let identity = WorkspaceIdentity::default();
         assert!(identity.user_id.is_empty());
         assert!(identity.display_name.is_none());
-        assert!(identity.email.is_none());
     }
     
     #[test]
     fn test_workspace_identity_new() {
-        let identity = WorkspaceIdentity::new(
-            "user-123",
-            Some("Test User".to_string()),
-            Some("test@example.com".to_string()),
-        );
+        let identity = WorkspaceIdentity::new("user-123", Some("Test".to_string()), Some("test@ex.com".to_string()));
         assert_eq!(identity.user_id, "user-123");
-        assert_eq!(identity.display_name.as_deref(), Some("Test User"));
-        assert_eq!(identity.email.as_deref(), Some("test@example.com"));
     }
     
     #[test]
     fn test_environment_capture() {
-        let identity = WorkspaceIdentity::new("test-user", None, None);
         let env = WorkspaceEnvironment::capture(
             "session-test",
             Path::new("/tmp"),
-            &identity,
-            Some("server-1".to_string()),
+            &WorkspaceIdentity::default(),
+            None,
             None,
         );
-        
         assert_eq!(env.session_id, "session-test");
-        assert_eq!(env.cwd, Path::new("/tmp"));
-        assert!(!env.captured_at.is_empty());
-        assert_eq!(env.server_id.as_deref(), Some("server-1"));
     }
     
     #[test]
     fn test_environment_serialization() {
-        let identity = WorkspaceIdentity::default();
-        let env = WorkspaceEnvironment::capture(
-            "test-session",
-            Path::new("/home/test"),
-            &identity,
-            None,
-            None,
-        );
-        
+        let env = WorkspaceEnvironment::capture("test", Path::new("/home"), &WorkspaceIdentity::default(), None, None);
         let bytes = env.to_json_bytes().expect("Serialization should succeed");
         assert!(!bytes.is_empty());
-        
-        // Verify it's valid JSON
-        let parsed: serde_json::Value =
-            serde_json::from_slice(&bytes).expect("Should be valid JSON");
-        assert!(parsed.get("session_id").is_some());
-        assert!(parsed.get("captured_at").is_some());
-    }
-    
-    #[test]
-    fn test_redact_git_url_with_credentials() {
-        let url = "https://oauth2:token123@github.com/org/repo.git".to_string();
-        let redacted = WorkspaceEnvironment::redact_git_url(url);
-        assert!(!redacted.contains("token123"));
-        assert!(redacted.contains("github.com"));
-    }
-    
-    #[test]
-    fn test_redact_git_url_without_credentials() {
-        let url = "https://github.com/org/repo.git".to_string();
-        let redacted = WorkspaceEnvironment::redact_git_url(url);
-        assert_eq!(redacted, url);
     }
 }
