@@ -2,7 +2,7 @@
 //!
 //! This crate defines the wire format for `x.ai/hooks/*` and `x.ai/plugins/*`
 //! ACP extension methods. It is dependency-free (only `serde`) so both
-//! `xai-grok-shell` and `xai-grok-pager` can depend on it without pulling
+//! `xai-nemesis-shell` and `xai-nemesis-pager` can depend on it without pulling
 //! in domain logic.
 //!
 //! Conversion from domain types (`HookSpec`, `LoadedPlugin`) to these DTOs
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 /// Plugin scope.
 ///
-/// Maps from `PluginScope` in `xai-grok-agent`. Variant renames:
+/// Maps from `PluginScope` in `xai-nemesis-agent`. Variant renames:
 /// - source `CliOverride` -> DTO `Cli` (matches Display output "cli")
 /// - source `ConfigPath` -> DTO `Config` (matches Display output "config")
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,18 +30,18 @@ pub enum PluginScope {
 
 /// The concrete discovery source a plugin came from.
 ///
-/// Maps from `PluginOrigin` in `xai-grok-agent`. Optional on [`PluginInfo`]
+/// Maps from `PluginOrigin` in `xai-nemesis-agent`. Optional on [`PluginInfo`]
 /// so older shells (which don't send it) deserialize to `None`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PluginOrigin {
     /// CLI `--plugin-dir`.
     CliOverride,
-    /// Project `.grok/plugins/`.
+    /// Project `.nemesis/plugins/`.
     ProjectGrok,
     /// Project `.claude/plugins/`.
     ProjectClaude,
-    /// `$GROK_HOME/plugins/`.
+    /// `$NEMESIS_HOME/plugins/`.
     UserGrok,
     /// `~/.claude/plugins/`.
     UserClaude,
@@ -76,7 +76,7 @@ pub enum PluginOrigin {
 
 /// Hook event type.
 ///
-/// Maps from `HookEventName` in `xai-grok-hooks`. The source type's
+/// Maps from `HookEventName` in `xai-nemesis-hooks`. The source type's
 /// `SubagentEnd` variant (backward-compat alias) is collapsed into
 /// `SubagentStop` during conversion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -202,7 +202,7 @@ pub struct HookInfo {
     pub timeout_ms: u64,
     /// Source directory of the hook definition file.
     pub source_dir: String,
-    /// Whether this hook is disabled via ~/.grok/disabled-hooks.
+    /// Whether this hook is disabled via ~/.nemesis/disabled-hooks.
     #[serde(default)]
     pub disabled: bool,
 }
@@ -618,7 +618,7 @@ mod tests {
     #[test]
     fn hooks_action_serde_roundtrip() {
         let action = HooksAction::Add {
-            path: "/home/user/.grok/hooks".into(),
+            path: "/home/user/.nemesis/hooks".into(),
         };
         let json = serde_json::to_string(&action).unwrap();
         let parsed: HooksAction = serde_json::from_str(&json).unwrap();
@@ -707,7 +707,7 @@ mod tests {
             command: Some("check.sh".into()),
             url: None,
             timeout_ms: 5000,
-            source_dir: "/home/user/.grok/hooks".into(),
+            source_dir: "/home/user/.nemesis/hooks".into(),
             disabled: false,
         };
         let json = serde_json::to_string(&hook).unwrap();
@@ -724,7 +724,7 @@ mod tests {
         let plugin = PluginInfo {
             name: "test-plugin".into(),
             id: "user/abc12345/test-plugin".into(),
-            root: "/home/user/.grok/plugins/test-plugin".into(),
+            root: "/home/user/.nemesis/plugins/test-plugin".into(),
             scope: PluginScope::User,
             trusted: true,
             enabled: true,

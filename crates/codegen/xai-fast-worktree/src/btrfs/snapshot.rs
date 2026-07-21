@@ -662,7 +662,7 @@ mod tests {
         let meta = BtrfsSnapshotMetadata {
             kind: Cow::Borrowed("btrfs"),
             snapshot_path: PathBuf::from("/mnt/btrfs/worktrees/wt-abc"),
-            mount_target: PathBuf::from("/home/user/.grok/worktrees/repo/session/wt-abc"),
+            mount_target: PathBuf::from("/home/user/.nemesis/worktrees/repo/session/wt-abc"),
             created_at: "1740000000s-since-epoch".to_string(),
         };
         let json = serde_json::to_string_pretty(&meta).unwrap();
@@ -679,7 +679,7 @@ mod tests {
         let tmp = tempfile::TempDir::new().unwrap();
         let snapshot_path = tmp.path().join("wt-abc");
         std::fs::create_dir(&snapshot_path).unwrap();
-        let mount_target = Path::new("/home/user/.grok/worktrees/wt-abc");
+        let mount_target = Path::new("/home/user/.nemesis/worktrees/wt-abc");
 
         write_btrfs_metadata(&snapshot_path, mount_target).unwrap();
 
@@ -726,7 +726,7 @@ mod tests {
         // btrfs mount differs from subvolume root → snapshots under worktrees/.
         let btrfs_mount = Path::new("/mnt/btrfs");
         let subvolume_root = Path::new("/workspace/repo");
-        let dest = Path::new("/home/user/.grok/worktrees/repo/session/wt-abc");
+        let dest = Path::new("/home/user/.nemesis/worktrees/repo/session/wt-abc");
         let got = snapshot_dest_path(btrfs_mount, subvolume_root, dest);
         assert_eq!(got.parent().unwrap(), Path::new("/mnt/btrfs/worktrees"));
         assert_hashed_name(got.file_name().unwrap().to_str().unwrap(), "wt-abc");
@@ -738,7 +738,7 @@ mod tests {
     fn test_snapshot_dest_path_subvol_mount() {
         // btrfs mount IS the subvolume root → snapshots under .grok-snapshots/.
         let mount = Path::new("/workspace/repo");
-        let dest = Path::new("/home/user/.grok/worktrees/repo/session/wt-xyz");
+        let dest = Path::new("/home/user/.nemesis/worktrees/repo/session/wt-xyz");
         let got = snapshot_dest_path(mount, mount, dest);
         assert_eq!(
             got.parent().unwrap(),
@@ -762,8 +762,8 @@ mod tests {
         // same on-disk snapshot (the cross-repo data-loss collision).
         let btrfs_mount = Path::new("/mnt/btrfs");
         let subvolume_root = Path::new("/workspace/repo");
-        let dest_a = Path::new("/home/user/.grok/worktrees/repo-a/session/wt-abc");
-        let dest_b = Path::new("/home/user/.grok/worktrees/repo-b/session/wt-abc");
+        let dest_a = Path::new("/home/user/.nemesis/worktrees/repo-a/session/wt-abc");
+        let dest_b = Path::new("/home/user/.nemesis/worktrees/repo-b/session/wt-abc");
         let a = snapshot_dest_path(btrfs_mount, subvolume_root, dest_a);
         let b = snapshot_dest_path(btrfs_mount, subvolume_root, dest_b);
         assert_ne!(
@@ -781,7 +781,7 @@ mod tests {
         let tmp = tempfile::TempDir::new().unwrap();
         let snapshot_path = tmp.path().join("worktrees").join("wt-abc-deadbeef");
         std::fs::create_dir_all(&snapshot_path).unwrap();
-        let dest = Path::new("/home/user/.grok/worktrees/repo-a/session/wt-abc");
+        let dest = Path::new("/home/user/.nemesis/worktrees/repo-a/session/wt-abc");
 
         // No metadata yet → cannot prove ownership → refuse.
         assert!(!snapshot_meta_targets(&snapshot_path, dest));
@@ -791,7 +791,7 @@ mod tests {
         assert!(snapshot_meta_targets(&snapshot_path, dest));
 
         // Metadata for a DIFFERENT dest → must refuse (would clobber other session).
-        let other = Path::new("/home/user/.grok/worktrees/repo-b/session/wt-abc");
+        let other = Path::new("/home/user/.nemesis/worktrees/repo-b/session/wt-abc");
         assert!(!snapshot_meta_targets(&snapshot_path, other));
     }
 
@@ -800,7 +800,7 @@ mod tests {
         let tmp = tempfile::TempDir::new().unwrap();
         let snapshot_path = tmp.path().join("worktrees").join("wt-abc-deadbeef");
         std::fs::create_dir_all(&snapshot_path).unwrap();
-        let dest = Path::new("/home/user/.grok/worktrees/repo-a/session/wt-abc");
+        let dest = Path::new("/home/user/.nemesis/worktrees/repo-a/session/wt-abc");
 
         // No sibling meta → crashed-creation orphan → reclaimable.
         assert_eq!(
@@ -816,7 +816,7 @@ mod tests {
         );
 
         // Meta records a different dest → another session → must refuse.
-        let other = Path::new("/home/user/.grok/worktrees/repo-b/session/wt-abc");
+        let other = Path::new("/home/user/.nemesis/worktrees/repo-b/session/wt-abc");
         assert_eq!(
             snapshot_meta_state(&snapshot_path, other),
             SnapshotMetaState::Mismatch

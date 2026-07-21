@@ -1,0 +1,77 @@
+name: Build NEMESIS Agent
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build NEMESIS TUI
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libprotobuf-dev \
+            protobuf-compiler \
+            git \
+            curl
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Configure Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: .
+
+      - name: Build NEMESIS (release mode)
+        env: 
+          RUSTFLAGS: "-C target-cpu=native"
+        run: |
+          cargo build --release --bin nemesis 2>&1
+
+      - name: Prepare artifact
+        run: |
+          chmod +x target/release/nemesis
+          ls -la target/release/nemesis
+          ./target/release/nemesis --version || echo "Version check done"
+
+      - name: Upload NEMESIS binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: nemesis-agent-${{ runner.os }}
+          path: target/release/nemesis
+          retention-days: 30
+
+      - name: Release summary
+        if: success()
+        run: |
+          echo "## ✅ NEMESIS Agent Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Binary:** \`nemesis\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** Ubuntu 22.04 (linux-x86_64)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Usage:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "./nemesis" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Features:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Full TUI interface (Ratatui)" >> $GITHUB_STEP_SUMMARY
+          echo "- Interactive chat with LLM" >> $GITHUB_STEP_SUMMARY
+          echo "- File read/write operations" >> $GITHUB_STEP_SUMMARY
+          echo "- Terminal command execution" >> $GITHUB_STEP_SUMMARY
+          echo "- Web search capabilities" >> $GITHUB_STEP_SUMMARY

@@ -1,4 +1,4 @@
-//! Shared prompt-queue wire types for xai-grok-shell and xai-grok-pager.
+//! Shared prompt-queue wire types for xai-nemesis-shell and xai-nemesis-pager.
 
 mod types;
 

@@ -17,8 +17,8 @@ strum = { workspace = true }
 tokio = { workspace = true, features = ["sync", "rt", "macros"] }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
-xai-grok-compaction = { path = "../../common/xai-grok-compaction" }
-xai-grok-sampling-types = { path = "../xai-grok-sampling-types" }
+xai-nemesis-compaction = { path = "../../common/xai-nemesis-compaction" }
+xai-nemesis-sampling-types = { path = "../xai-nemesis-sampling-types" }
 xai-token-estimation = { workspace = true }
 
 [dev-dependencies]

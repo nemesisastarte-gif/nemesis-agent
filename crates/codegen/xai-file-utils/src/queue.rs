@@ -25,7 +25,7 @@ use tokio::io::{AsyncRead, ReadBuf};
 use tokio::sync::{Notify, mpsc, oneshot};
 use tracing::Instrument;
 use xai_circuit_breaker::{Disposition, RetryPolicy};
-use xai_grok_auth::AuthCredentialProvider;
+use xai_nemesis_auth::AuthCredentialProvider;
 /// Resolves current upload credentials at upload time, plus optional
 /// hooks the queue worker uses to wire refresh-aware credentials and
 /// `auth_401_attribution` emission into the per-upload `StorageClient`.
@@ -264,7 +264,7 @@ pub const QUEUE_ITEM_SIDECAR_SCHEMA_VERSION: u32 = 1;
 /// [`UploadQueue::enqueue_bytes_blocking`] (the fire-and-forget paths write the
 /// temp file alone). It carries everything a fresh process needs to re-enqueue
 /// the upload after a restart — the temp-file name alone is lossy (truncated
-/// `session_id`, no GCS path). Read by `xai_grok_workspace::recovery`.
+/// `session_id`, no GCS path). Read by `xai_nemesis_workspace::recovery`.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct QueueItemSidecar {
     /// Manifest schema version (see [`QUEUE_ITEM_SIDECAR_SCHEMA_VERSION`]).
@@ -562,20 +562,20 @@ enum EnqueueAttempt {
 impl UploadQueue {
     /// Create the queue, initialize the temp directory, and spawn the background worker.
     pub fn spawn(
-        grok_home: &Path,
+        nemesis_home: &Path,
         resolver: Arc<dyn TraceExportSource>,
         retry_policy: UploadRetryPolicy,
     ) -> Self {
-        Self::spawn_with_concurrency(grok_home, resolver, retry_policy, DEFAULT_MAX_CONCURRENT)
+        Self::spawn_with_concurrency(nemesis_home, resolver, retry_policy, DEFAULT_MAX_CONCURRENT)
     }
     /// Create the queue with explicit concurrency limit for the background worker.
     pub fn spawn_with_concurrency(
-        grok_home: &Path,
+        nemesis_home: &Path,
         resolver: Arc<dyn TraceExportSource>,
         mut retry_policy: UploadRetryPolicy,
         max_concurrent: usize,
     ) -> Self {
-        let queue_dir = grok_home.join("upload_queue");
+        let queue_dir = nemesis_home.join("upload_queue");
         if let Err(e) = std::fs::create_dir_all(&queue_dir) {
             tracing::warn!(error = % e, "Failed to create upload queue dir");
         }
@@ -2285,8 +2285,8 @@ pub fn last_orphans_cleaned() -> u64 {
 /// Called at agent startup to remove files and directories older than `max_age`
 /// that were left behind by crashes or ungraceful shutdowns. Returns the number
 /// of entries removed.
-pub fn cleanup_orphaned_uploads(grok_home: &Path, max_age: Duration) -> u64 {
-    let cleaned = cleanup_queue_dir(&grok_home.join("upload_queue"), max_age, None);
+pub fn cleanup_orphaned_uploads(nemesis_home: &Path, max_age: Duration) -> u64 {
+    let cleaned = cleanup_queue_dir(&nemesis_home.join("upload_queue"), max_age, None);
     LAST_ORPHANS_CLEANED.store(cleaned, Ordering::Relaxed);
     cleaned
 }
