@@ -300,6 +300,20 @@ impl WorkspaceEnvironment {
     }
 }
 
+impl From<WorkspaceEnvironment> for Vec<u8> {
+    fn from(env: WorkspaceEnvironment) -> Self {
+        // Unwrap is safe here because WorkspaceEnvironment only contains String/Option fields
+        // which are always serializable
+        serde_json::to_vec(&env).unwrap_or_default()
+    }
+}
+
+impl From<&WorkspaceEnvironment> for Vec<u8> {
+    fn from(env: &WorkspaceEnvironment) -> Self {
+        serde_json::to_vec(env).unwrap_or_default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
