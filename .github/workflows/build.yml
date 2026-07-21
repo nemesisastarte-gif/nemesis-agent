@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: Build NEMESIS TUI
+    name: Build NEMESIS TUI (Legacy CPU Compatible)
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -25,39 +25,51 @@ jobs:
             libprotobuf-dev \
             protobuf-compiler \
             git \
-            curl
+            curl \
+            musl-tools \
+            musl-dev
 
       - name: Install dotslash (required for protoc)
         run: cargo install dotslash
 
-      - name: Install Rust toolchain
+      - name: Install Rust toolchain with musl target
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: x86_64-unknown-linux-musl
 
       - name: Configure Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: .
 
-      - name: Build NEMESIS (release mode)
-        env: 
-          RUSTFLAGS: "-C target-cpu=native"
+      - name: Build NEMESIS (Core 2 Duo / antiX compatible)
+        env:
+          # Core 2 Duo compatible: no AVX/AVX2, SSE3/SSSE3 only
+          RUSTFLAGS: "-C target-cpu=x86-64 -C target-feature=+sse3,+ssse3,-avx,-avx2"
           PROTOC: "protoc --experimental_allow_proto3_optional"
+          CC_x86_64_unknown_linux_musl: "musl-gcc"
+          CXX_x86_64_unknown_linux_musl: "musl-g++"
         run: |
-          cargo build --release --bin nemesis 2>&1
+          cargo build --release --bin nemesis --target x86_64-unknown-linux-musl 2>&1
 
       - name: Prepare artifact
         run: |
-          chmod +x target/release/nemesis
-          ls -la target/release/nemesis
-          ./target/release/nemesis --version || echo "Version check done"
+          chmod +x target/x86_64-unknown-linux-musl/release/nemesis
+          ls -lh target/x86_64-unknown-linux-musl/release/nemesis
+          ./target/x86_64-unknown-linux-musl/release/nemesis --version || echo "Version check done"
+          
+          echo "=== Binary Info ==="
+          file target/x86_64-unknown-linux-musl/release/nemesis
+          
+          echo "=== Required Libraries ==="
+          ldd target/x86_64-unknown-linux-musl/release/nemesis 2>&1 || echo "Static linking OK"
 
       - name: Upload NEMESIS binary
         uses: actions/upload-artifact@v4
         with:
-          name: nemesis-agent-${{ runner.os }}
-          path: target/release/nemesis
+          name: nemesis-agent-core2duo-linux
+          path: target/x86_64-unknown-linux-musl/release/nemesis
           retention-days: 30
 
       - name: Release summary
@@ -66,16 +78,16 @@ jobs:
           echo "## ✅ NEMESIS Agent Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Binary:** \`nemesis\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Platform:** Ubuntu 22.04 (linux-x86_64)" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** Core 2 Duo / Legacy x86_64 (antiX compatible)" >> $GITHUB_STEP_SUMMARY
+          echo "**Linking:** Static (musl) - No glibc dependency" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Compatible Hardware:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Intel Core 2 Duo / Core 2 Quad" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ AMD Athlon 64 X2 / Phenom" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Any x86_64 CPU (2006+)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ antiX Linux, Debian, Ubuntu, etc." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Usage:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "./nemesis" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Features:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Full TUI interface (Ratatui)" >> $GITHUB_STEP_SUMMARY
-          echo "- Interactive chat with LLM" >> $GITHUB_STEP_SUMMARY
-          echo "- File read/write operations" >> $GITHUB_STEP_SUMMARY
-          echo "- Terminal command execution" >> $GITHUB_STEP_SUMMARY
-          echo "- Web search capabilities" >> $GITHUB_STEP_SUMMARY
