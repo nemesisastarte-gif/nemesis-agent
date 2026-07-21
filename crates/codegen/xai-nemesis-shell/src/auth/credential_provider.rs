@@ -1,5 +1,5 @@
 use crate::auth::AuthManager;
-use crate::util::grok_auth_credentials::GrokAuthCredentials;
+use crate::util::nemesis_auth_credentials::GrokAuthCredentials;
 use reqwest::RequestBuilder;
 use std::sync::Arc;
 use xai_nemesis_auth::{

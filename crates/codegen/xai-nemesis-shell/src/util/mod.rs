@@ -1,5 +1,5 @@
 pub mod config;
-pub mod grok_auth_credentials;
+pub mod nemesis_auth_credentials;
 pub mod hooks;
 
 // The foundation utilities live in `xai-nemesis-shell-base` (upstream of this

@@ -320,14 +320,14 @@ pub struct FeedbackClient {
     http: reqwest::Client,
     client: reqwest_middleware::ClientWithMiddleware,
     base_url: String,
-    credentials: crate::util::grok_auth_credentials::GrokAuthCredentials,
+    credentials: crate::util::nemesis_auth_credentials::GrokAuthCredentials,
     session_id: Option<String>,
 }
 
 impl FeedbackClient {
     pub fn new(base_url: impl Into<String>, user_token: Option<String>) -> Self {
         let http = crate::http::shared_client();
-        let credentials = crate::util::grok_auth_credentials::GrokAuthCredentials::new(user_token);
+        let credentials = crate::util::nemesis_auth_credentials::GrokAuthCredentials::new(user_token);
         let client = Self::build_middleware_client(&http, &credentials);
         Self {
             http,
@@ -361,7 +361,7 @@ impl FeedbackClient {
         base_url: impl Into<String>,
         user_token: Option<String>,
     ) -> Self {
-        let credentials = crate::util::grok_auth_credentials::GrokAuthCredentials::new(user_token);
+        let credentials = crate::util::nemesis_auth_credentials::GrokAuthCredentials::new(user_token);
         let client = Self::build_middleware_client(&http, &credentials);
         Self {
             http,
@@ -398,7 +398,7 @@ impl FeedbackClient {
 
     fn build_middleware_client(
         http: &reqwest::Client,
-        credentials: &crate::util::grok_auth_credentials::GrokAuthCredentials,
+        credentials: &crate::util::nemesis_auth_credentials::GrokAuthCredentials,
     ) -> reqwest_middleware::ClientWithMiddleware {
         let provider = Self::make_auth_provider(credentials);
         // max_retries=0: the middleware stamps the auth header but does NOT
@@ -415,7 +415,7 @@ impl FeedbackClient {
     }
 
     fn make_auth_provider(
-        credentials: &crate::util::grok_auth_credentials::GrokAuthCredentials,
+        credentials: &crate::util::nemesis_auth_credentials::GrokAuthCredentials,
     ) -> Arc<dyn xai_nemesis_auth::AuthCredentialProvider> {
         if let Some(am) = credentials.auth_manager() {
             Arc::new(

@@ -56,7 +56,7 @@ async fn add_bundle_fetch_headers(
         Some(am) => am.auth().await.ok(),
         None => None,
     };
-    let mut credentials = crate::util::grok_auth_credentials::GrokAuthCredentials::new(
+    let mut credentials = crate::util::nemesis_auth_credentials::GrokAuthCredentials::new(
         resolved_auth.as_ref().map(|auth| auth.key.clone()),
     );
     credentials.deployment_key = deployment_key.map(str::to_owned);

@@ -141,7 +141,7 @@ pub struct SessionRegistryClient {
     raw_client: reqwest::Client,
     client: reqwest_middleware::ClientWithMiddleware,
     base_url: String,
-    credentials: crate::util::grok_auth_credentials::GrokAuthCredentials,
+    credentials: crate::util::nemesis_auth_credentials::GrokAuthCredentials,
     session_id: Option<String>,
 }
 
@@ -152,7 +152,7 @@ impl SessionRegistryClient {
             raw_client: http_client.clone(),
             client: reqwest_middleware::ClientBuilder::new(http_client).build(),
             base_url: base_url.into(),
-            credentials: crate::util::grok_auth_credentials::GrokAuthCredentials::new(Some(
+            credentials: crate::util::nemesis_auth_credentials::GrokAuthCredentials::new(Some(
                 user_token.into(),
             )),
             session_id: None,
