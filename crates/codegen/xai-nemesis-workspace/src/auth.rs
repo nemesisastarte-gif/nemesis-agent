@@ -108,6 +108,29 @@ pub trait AuthProvider: Send + Sync {
 /// A shared, thread-safe reference to an auth provider.
 pub type SharedAuthProvider = std::sync::Arc<dyn AuthProvider>;
 
+// Implement IdentityProvider for AuthIdentity so it can be used with
+// WorkspaceIdentity::from_identity()
+impl crate::upload::environment::IdentityProvider for AuthIdentity {
+    fn get_user_id(&self) -> Option<&str> {
+        self.user_id.as_deref()
+    }
+    
+    fn get_display_name(&self) -> Option<&str> {
+        self.display_name.as_deref()
+    }
+    
+    fn get_email(&self) -> Option<&str> {
+        self.email.as_deref()
+    }
+}
+
+// Implement From<AuthIdentity> for WorkspaceIdentity
+impl From<AuthIdentity> for crate::upload::environment::WorkspaceIdentity {
+    fn from(auth: AuthIdentity) -> Self {
+        crate::upload::environment::WorkspaceIdentity::from_identity(&auth)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

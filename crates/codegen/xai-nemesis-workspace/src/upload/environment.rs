@@ -70,27 +70,8 @@ pub trait IdentityProvider {
     fn get_email(&self) -> Option<&str>;
 }
 
-// Implement IdentityProvider for our local AuthIdentity
-impl IdentityProvider for super::auth::AuthIdentity {
-    fn get_user_id(&self) -> Option<&str> {
-        self.user_id()
-    }
-    
-    fn get_display_name(&self) -> Option<&str> {
-        self.display_name()
-    }
-    
-    fn get_email(&self) -> Option<&str> {
-        self.email()
-    }
-}
-
-// Implement From<crate::auth::AuthIdentity> using the trait
-impl From<super::auth::AuthIdentity> for WorkspaceIdentity {
-    fn from(auth: super::auth::AuthIdentity) -> Self {
-        Self::from_identity(&auth)
-    }
-}
+// Note: IdentityProvider is implemented for crate::auth::AuthIdentity in the auth module itself
+// to avoid circular dependency issues with super:: references
 
 /// Captured workspace environment state.
 ///
@@ -302,7 +283,7 @@ impl WorkspaceEnvironment {
         if url.contains('@') && url.starts_with("https://") {
             if let Some(at_pos) = url.find('@') {
                 if let Some(scheme_end) = url.find("://") {
-                    return format!("{}{}{}", &url[..scheme_end + 3], &url[at_pos + 1..]);
+                    return format!("{}{}", &url[..scheme_end + 3], &url[at_pos + 1..]);
                 }
             }
         }
