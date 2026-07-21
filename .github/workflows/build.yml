@@ -27,6 +27,9 @@ jobs:
             git \
             curl
 
+      - name: Install dotslash (required for protoc)
+        run: cargo install dotslash
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -40,6 +43,7 @@ jobs:
       - name: Build NEMESIS (release mode)
         env: 
           RUSTFLAGS: "-C target-cpu=native"
+          PROTOC: "protoc --experimental_allow_proto3_optional"
         run: |
           cargo build --release --bin nemesis 2>&1
 
