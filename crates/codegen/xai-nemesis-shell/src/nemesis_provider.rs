@@ -93,65 +93,70 @@ impl NemesisProviderConfig {
         info!(provider = %self.provider, base_url = %self.base_url, 
              "Applying NEMESIS provider configuration");
         
-        // Set API key as XAI_API_KEY (used by the sampler client)
-        std::env::set_var("XAI_API_KEY", &self.api_key);
-        
-        // Also set as NEMESIS_API_KEY for reference
-        std::env::set_var("NEMESIS_API_KEY", &self.api_key);
-        
-        // Override the API base URL based on provider
-        match self.provider.as_str() {
-            "nvidia-nim" => {
-                let url = if self.base_url.is_empty() || self.base_url == "https://integrate.api.nvidia.com/v1" {
-                    "https://integrate.api.nvidia.com/v1".to_string()
-                } else {
-                    self.base_url.clone()
-                };
-                
-                // NVIDIA NIM uses OpenAI-compatible format but with different URL structure
-                std::env::set_var("GROK_XAI_API_BASE_URL", &url);
-                std::env::set_var("GROK_MODELS_BASE_URL", &url);
-                std::env::set_var("GROK_CLI_CHAT_PROXY_BASE_URL", &url);
-            }
+        // SAFETY: These environment variable modifications are intentional for process-level config.
+        // We are in a single-threaded context during initialization, and these vars are read
+        // by child processes or later in the main thread after this function returns.
+        unsafe {
+            // Set API key as XAI_API_KEY (used by the sampler client)
+            std::env::set_var("XAI_API_KEY", &self.api_key);
             
-            "groq" => {
-                let url = if self.base_url.is_empty() || self.base_url == "https://api.groq.com/openai/v1" {
-                    "https://api.groq.com/openai/v1".to_string()
-                } else {
-                    self.base_url.clone()
-                };
-                
-                std::env::set_var("GROK_XAI_API_BASE_URL", &url);
-                std::env::set_var("GROK_MODELS_BASE_URL", &url);
-                std::env::set_var("GROK_CLI_CHAT_PROXY_BASE_URL", &url);
-            }
+            // Also set as NEMESIS_API_KEY for reference
+            std::env::set_var("NEMESIS_API_KEY", &self.api_key);
             
-            "fireworks" => {
-                let url = if self.base_url.is_empty() || self.base_url == "https://api.fireworks.ai/inference/v1" {
-                    "https://api.fireworks.ai/inference/v1".to_string()
-                } else {
-                    self.base_url.clone()
-                };
-                
-                std::env::set_var("GROK_XAI_API_BASE_URL", &url);
-                std::env::set_var("GROK_MODELS_BASE_URL", &url);
-                std::env::set_var("GROK_CLI_CHAT_PROXY_BASE_URL", &url);
-            }
-            
-            "custom" => {
-                if !self.base_url.is_empty() {
-                    std::env::set_var("GROK_XAI_API_BASE_URL", &self.base_url);
-                    std::env::set_var("GROK_MODELS_BASE_URL", &self.base_url);
-                    std::env::set_var("GROK_CLI_CHAT_PROXY_BASE_URL", &self.base_url);
+            // Override the API base URL based on provider
+            match self.provider.as_str() {
+                "nvidia-nim" => {
+                    let url = if self.base_url.is_empty() || self.base_url == "https://integrate.api.nvidia.com/v1" {
+                        "https://integrate.api.nvidia.com/v1".to_string()
+                    } else {
+                        self.base_url.clone()
+                    };
+                    
+                    // NVIDIA NIM uses OpenAI-compatible format but with different URL structure
+                    std::env::set_var("GROK_XAI_API_BASE_URL", &url);
+                    std::env::set_var("GROK_MODELS_BASE_URL", &url);
+                    std::env::set_var("GROK_CLI_CHAT_PROXY_BASE_URL", &url);
                 }
-            }
-            
-            "grok" | _ => {
-                // For Grok, use defaults (don't override)
-                // The user will authenticate via OAuth flow
-                std::env::remove_var("GROK_XAI_API_BASE_URL");
-                std::env::remove_var("GROK_MODELS_BASE_URL");
-                std::env::remove_var("GROK_CLI_CHAT_PROXY_BASE_URL");
+                
+                "groq" => {
+                    let url = if self.base_url.is_empty() || self.base_url == "https://api.groq.com/openai/v1" {
+                        "https://api.groq.com/openai/v1".to_string()
+                    } else {
+                        self.base_url.clone()
+                    };
+                    
+                    std::env::set_var("GROK_XAI_API_BASE_URL", &url);
+                    std::env::set_var("GROK_MODELS_BASE_URL", &url);
+                    std::env::set_var("GROK_CLI_CHAT_PROXY_BASE_URL", &url);
+                }
+                
+                "fireworks" => {
+                    let url = if self.base_url.is_empty() || self.base_url == "https://api.fireworks.ai/inference/v1" {
+                        "https://api.fireworks.ai/inference/v1".to_string()
+                    } else {
+                        self.base_url.clone()
+                    };
+                    
+                    std::env::set_var("GROK_XAI_API_BASE_URL", &url);
+                    std::env::set_var("GROK_MODELS_BASE_URL", &url);
+                    std::env::set_var("GROK_CLI_CHAT_PROXY_BASE_URL", &url);
+                }
+                
+                "custom" => {
+                    if !self.base_url.is_empty() {
+                        std::env::set_var("GROK_XAI_API_BASE_URL", &self.base_url);
+                        std::env::set_var("GROK_MODELS_BASE_URL", &self.base_url);
+                        std::env::set_var("GROK_CLI_CHAT_PROXY_BASE_URL", &self.base_url);
+                    }
+                }
+                
+                "grok" | _ => {
+                    // For Grok, use defaults (don't override)
+                    // The user will authenticate via OAuth flow
+                    std::env::remove_var("GROK_XAI_API_BASE_URL");
+                    std::env::remove_var("GROK_MODELS_BASE_URL");
+                    std::env::remove_var("GROK_CLI_CHAT_PROXY_BASE_URL");
+                }
             }
         }
         
