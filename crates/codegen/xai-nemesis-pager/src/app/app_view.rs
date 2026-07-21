@@ -1141,11 +1141,18 @@ pub struct AppView {
 }
 impl AppView {
     pub fn is_zdr_blocked(&self) -> bool {
-        self.is_zdr && !self.zdr_access_enabled
+        // NEMESIS MODE: Never block due to ZDR - users use their own providers
+        false
+        // Original: self.is_zdr && !self.zdr_access_enabled
     }
     /// User is not gated (no gate from remote settings or subscription fallback).
+    /// 
+    /// NEMESIS: Always returns true to bypass Grok's subscription/gate checks.
+    /// Users configure their own providers via /auth command.
     pub fn has_access(&self) -> bool {
-        self.gate.is_none()
+        // NEMESIS MODE: Bypass all access gates - user provides their own API keys
+        true
+        // Original: self.gate.is_none()
     }
     /// True when the user should not see the prompt (gate, subscription, or ZDR).
     pub fn is_access_blocked(&self) -> bool {
