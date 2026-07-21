@@ -87,7 +87,10 @@ impl xai_file_utils::queue::TraceExportSource for WorkspaceTraceExportSource {
         xai_file_utils::TraceExportConfig {
             bucket_url: Some(self.storage.base_url.clone()),
             service_account_key: None,
-            upload_method: xai_file_utils::UploadConfig::default_upload_method(),
+            // Use Direct method with no service account (minimal config)
+            upload_method: xai_file_utils::UploadMethod::Direct { 
+                service_account_key: None 
+            },
             prefix_dir: None,
             gcs_prefix: Some("nemesis".to_string()),
             absolute_paths: false,

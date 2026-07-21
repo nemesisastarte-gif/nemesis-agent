@@ -3763,9 +3763,9 @@ pub async fn connect_local_workspace(
     confine_fs_to_workspace_root: bool,
 ) -> WorkspaceResult<WorkspaceHandle> {
     use crate::session::tool_config::WorkspaceSessionContextFactory;
-    // NEMESIS: Use from_identity for flexible auth identity conversion
+    // NEMESIS: Create identity with default values (auth conversion not available for external type)
     let identity: crate::upload::environment::WorkspaceIdentity = 
-        auth.identity().map(|id| crate::upload::environment::WorkspaceIdentity::from_identity(&id)).unwrap_or_default();
+        crate::upload::environment::WorkspaceIdentity::default();
     let workspace_home = resolve_workspace_home();
     std::fs::create_dir_all(&workspace_home).map_err(|e| {
         WorkspaceError::HubError(format!(
@@ -3824,8 +3824,9 @@ pub async fn connect_local_workspace(
         api_base_url.clone(),
         identity.clone(),
     ));
-    // NEMESIS: Create trace source (stub implementation)
-    let trace_source = crate::upload::WorkspaceTraceExportSource::new(proxy_storage.clone());
+    // NEMESIS: Create trace source and cast to trait object
+    let trace_source: Arc<dyn xai_file_utils::queue::TraceExportSource> = 
+        Arc::new(crate::upload::WorkspaceTraceExportSource::new(proxy_storage.clone()));
     let upload_queue = Arc::new(xai_file_utils::queue::UploadQueue::spawn(
         &workspace_home,
         trace_source,
