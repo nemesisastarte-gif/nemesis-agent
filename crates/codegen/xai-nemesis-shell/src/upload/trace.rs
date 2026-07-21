@@ -1,4 +1,7 @@
 //! Session metadata upload functionality.
+//!
+//! This module provides session-level metadata upload capabilities for
+//! trace export and telemetry.
 
 use serde::{Deserialize, Serialize};
 
@@ -59,7 +62,7 @@ pub struct SessionMetadata {
 ///
 /// # Arguments
 /// * `metadata` - The session metadata to upload
-/// * `upload_queue` - Optional upload queue for async upload
+/// * `upload_queue` - Optional upload queue sender for async processing
 ///
 /// # Returns
 /// `Ok(())` if the metadata was successfully queued or no queue is configured.
@@ -76,10 +79,8 @@ pub async fn upload_session_metadata(
     );
     
     // NEMESIS: Log and succeed - actual upload handled by queue if configured
-    if let Some(_queue) = upload_queue {
-        // Signal that metadata is ready for upload
-        // In production, this would enqueue the metadata for background upload
-    }
+    // In the full build, this would enqueue the metadata for background upload
+    // via the xai_file_utils upload pipeline
     
     Ok(())
 }

@@ -1,91 +1,207 @@
-//! Artifact manifest tracking for upload coordination.
+//! Upload manifest: authoritative "turn upload is done" signal.
+//!
+//! This module provides artifact tracking for turn-level uploads,
+//! recording which artifacts succeeded, failed, or were skipped.
 
-use std::path::PathBuf;
+use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::mpsc;
 
-/// Tracks artifacts generated during a session for batch upload.
-///
-/// `ArtifactTracker` maintains a record of all artifacts (files, traces, etc.)
-/// produced during a session turn, enabling efficient batch upload and
-/// deduplication.
-#[derive(Debug, Clone)]
-pub struct ArtifactTracker {
-    /// Session identifier this tracker belongs to
-    pub session_id: String,
-    
-    /// Current turn number
-    pub turn_number: u64,
-    
-    /// Base directory for artifact storage
-    pub artifact_dir: PathBuf,
+pub(crate) const MANIFEST_SCHEMA_VERSION: u32 = 3;
+
+/// Status of an individual artifact upload.
+#[derive(Debug, serde::Serialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum ArtifactStatus {
+    /// Upload completed successfully
+    Succeeded,
+    /// Upload failed
+    Failed,
+    /// Upload was skipped (not needed)
+    Skipped,
+    /// Artifact was enqueued for background upload
+    Enqueued,
 }
 
-impl ArtifactTracker {
-    /// Create a new artifact tracker for the given session and turn.
-    pub fn new(session_id: String, turn_number: u64, base_dir: PathBuf) -> Self {
-        Self {
-            session_id,
-            turn_number,
-            artifact_dir: base_dir.join("artifacts").join(&session_id),
+/// Method used to upload artifacts.
+#[derive(serde::Serialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum ManifestUploadMethod {
+    /// Upload via proxy
+    Proxy,
+    /// Direct upload to GCS
+    Direct,
+    /// Upload to S3-compatible storage
+    S3,
+}
+
+impl ManifestUploadMethod {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Proxy => "proxy",
+            Self::Direct => "direct",
+            Self::S3 => "s3",
         }
     }
-    
-    /// Record an artifact for later upload.
-    #[allow(unused_variables)]
-    pub fn record_artifact(&self, artifact_type: &str, path: &PathBuf) {
-        tracing::debug!(
-            session_id = %self.session_id,
-            turn = self.turn_number,
-            artifact_type,
-            path = %path.display(),
-            "artifact recorded"
-        );
-    }
-    
-    /// Get the artifact directory for this turn.
-    pub fn turn_dir(&self) -> PathBuf {
-        self.artifact_dir.join(format!("turn_{}", self.turn_number))
+}
+
+/// Details about a failed upload.
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct FailureDetail {
+    pub reason: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Complete upload manifest for a turn.
+#[derive(serde::Serialize)]
+pub struct UploadManifest {
+    pub schema_version: u32,
+    pub fully_uploaded: bool,
+    pub completed_at: DateTime<Utc>,
+    pub upload_method: ManifestUploadMethod,
+    pub artifacts: HashMap<String, ArtifactStatus>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub failure_details: HashMap<String, FailureDetail>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub skip_details: HashMap<String, String>,
+}
+
+impl UploadManifest {
+    pub fn error(upload_method: ManifestUploadMethod) -> Self {
+        Self {
+            schema_version: MANIFEST_SCHEMA_VERSION,
+            fully_uploaded: false,
+            completed_at: Utc::now(),
+            upload_method,
+            artifacts: HashMap::new(),
+            failure_details: HashMap::new(),
+            skip_details: HashMap::new(),
+        }
     }
 }
 
-impl Default for ArtifactTracker {
-    fn default() -> Self {
-        Self::new(
-            "default-session".to_string(),
-            0,
-            std::env::temp_dir().join("nemesis-artifacts"),
-        )
+/// Internal state of the artifact tracker.
+#[derive(Debug, Default)]
+pub struct ArtifactTrackerInner {
+    pub statuses: HashMap<String, ArtifactStatus>,
+    pub failures: HashMap<String, FailureDetail>,
+    pub skips: HashMap<String, String>,
+}
+
+/// Thread-safe artifact tracker for recording upload outcomes.
+///
+/// Uses `parking_lot::Mutex` for low-overhead synchronization.
+pub type ArtifactTracker = Arc<parking_lot::Mutex<ArtifactTrackerInner>>;
+
+/// Create a new artifact tracker instance.
+pub fn new_artifact_tracker() -> ArtifactTracker {
+    Arc::new(parking_lot::Mutex::new(ArtifactTrackerInner::default()))
+}
+
+/// Result of an individual artifact upload operation.
+pub enum ArtifactResult<'a> {
+    /// Upload succeeded
+    Succeeded,
+    /// Handed to the async upload pipeline
+    Enqueued,
+    /// Upload failed
+    Failed {
+        reason: &'a str,
+        error: Option<&'a str>,
+    },
+}
+
+/// Record an artifact upload result in the tracker.
+pub fn record_artifact(
+    tracker: &ArtifactTracker,
+    filename: &str,
+    result: ArtifactResult<'_>,
+) {
+    match result {
+        ArtifactResult::Succeeded => {
+            tracker
+                .lock()
+                .statuses
+                .insert(filename.to_owned(), ArtifactStatus::Succeeded);
+        }
+        ArtifactResult::Enqueued => {
+            tracker
+                .lock()
+                .statuses
+                .insert(filename.to_owned(), ArtifactStatus::Enqueued);
+        }
+        ArtifactResult::Failed { reason, error } => {
+            let key = filename.to_owned();
+            let mut inner = tracker.lock();
+            inner.statuses.insert(key.clone(), ArtifactStatus::Failed);
+            inner.failures.insert(
+                key,
+                FailureDetail {
+                    reason: reason.to_owned(),
+                    error: error.map(truncate),
+                },
+            );
+        }
+    }
+}
+
+/// Record that an artifact was skipped.
+pub fn skip_artifact(tracker: &ArtifactTracker, filename: &str, reason: &str) {
+    let key = filename.to_owned();
+    let mut inner = tracker.lock();
+    inner.statuses.insert(key.clone(), ArtifactStatus::Skipped);
+    inner.skips.insert(key, reason.to_owned());
+}
+
+fn truncate(s: &str) -> &str {
+    match s.char_indices().nth(512) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
+    }
+}
+
+/// Build a complete manifest from the tracker state.
+pub fn build_manifest(
+    tracker: &ArtifactTracker,
+    upload_method: ManifestUploadMethod,
+) -> UploadManifest {
+    let inner = tracker.lock();
+    let artifacts = inner.statuses.clone();
+    let failure_details: HashMap<String, FailureDetail> = inner
+        .failures
+        .iter()
+        .filter(|(k, _)| matches!(artifacts.get(k.as_str()), Some(ArtifactStatus::Failed)))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    let skip_details: HashMap<String, String> = inner
+        .skips
+        .iter()
+        .filter(|(k, _)| matches!(artifacts.get(k.as_str()), Some(ArtifactStatus::Skipped)))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    let fully_uploaded = !artifacts
+        .values()
+        .any(|s| matches!(s, ArtifactStatus::Failed));
+    
+    UploadManifest {
+        schema_version: MANIFEST_SCHEMA_VERSION,
+        fully_uploaded,
+        completed_at: Utc::now(),
+        upload_method,
+        artifacts,
+        failure_details,
+        skip_details,
     }
 }
 
 /// Context for managing artifact uploads during a session.
-///
-/// Contains all state needed to coordinate uploads across multiple turns,
-/// including the upload queue, tracker, and configuration.
 #[derive(Debug, Clone)]
 pub struct ArtifactUploadContext {
-    /// The artifact tracker for recording produced artifacts
-    pub tracker: ArtifactTracker,
+    /// GCS configuration for uploads
+    #[allow(dead_code)]
+    pub gcs_config: xai_file_utils::TraceExportConfig,
     
-    /// Whether uploads are enabled for this context
-    pub uploads_enabled: bool,
-}
-
-impl ArtifactUploadContext {
-    /// Create a new upload context.
-    pub fn new(tracker: ArtifactTracker, uploads_enabled: bool) -> Self {
-        Self {
-            tracker,
-            uploads_enabled,
-        }
-    }
-    
-    /// Create a disabled context (no uploads will be performed).
-    pub fn disabled(session_id: String) -> Self {
-        Self::new(
-            ArtifactTracker::new(session_id, 0, std::env::temp_dir()),
-            false,
-        )
-    }
+    /// The artifact tracker for recording produced artifacts  
+    pub artifact_tracker: ArtifactTracker,
 }
