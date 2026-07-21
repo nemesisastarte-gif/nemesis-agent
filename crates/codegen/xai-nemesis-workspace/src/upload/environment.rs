@@ -41,6 +41,20 @@ impl WorkspaceIdentity {
     }
 }
 
+/// Implement From for AuthIdentity conversion.
+/// 
+/// This allows converting from the auth system's identity type
+/// to our workspace identity type.
+impl From<crate::auth::AuthIdentity> for WorkspaceIdentity {
+    fn from(auth: crate::auth::AuthIdentity) -> Self {
+        Self {
+            user_id: auth.user_id().unwrap_or_default().to_string(),
+            display_name: auth.display_name().map(|s| s.to_string()),
+            email: auth.email().map(|s| s.to_string()),
+        }
+    }
+}
+
 /// Captured workspace environment state.
 ///
 /// This struct holds a snapshot of the workspace environment at a point in time,
@@ -269,7 +283,7 @@ impl WorkspaceEnvironment {
         let repo = git2::Repository::discover(cwd).ok()?;
         
         let head = repo.head().ok()?;
-        let commit = head.target()?.to_string();
+        let commit_hash = head.target()?.to_string();
         let branch = head.shorthand().map(|s| s.to_string());
         
         // Check if working tree is dirty
@@ -292,7 +306,7 @@ impl WorkspaceEnvironment {
         
         Some(GitInfo {
             branch,
-            commit: format!("{:.8}", commit),  // Abbreviate to 8 chars
+            commit: Some(format!("{:.8}", commit_hash)),  // Abbreviate to 8 chars, wrapped in Some
             dirty,
             remote_url,
             root_path,

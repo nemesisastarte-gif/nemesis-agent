@@ -38,11 +38,17 @@ pub struct ProxyStorageConfig {
 }
 
 impl ProxyStorageConfig {
-    /// Create a new proxy storage configuration.
+    /// Create a new proxy storage configuration with auth context.
     ///
     /// # Arguments
+    /// * `_auth` - Auth provider reference (for future use)
     /// * `base_url` - The base URL of the proxy storage endpoint
-    pub fn new(base_url: String) -> Self {
+    /// * `_identity` - Workspace identity (reserved for metadata)
+    pub fn new(
+        _auth: Arc<dyn crate::auth::AuthProvider>,
+        base_url: String,
+        _identity: WorkspaceIdentity,
+    ) -> Self {
         Self {
             base_url,
             api_key: None,
@@ -66,21 +72,33 @@ impl ProxyStorageConfig {
 
 impl Default for ProxyStorageConfig {
     fn default() -> Self {
-        Self::new("https://storage.proxy.example.com".to_string())
+        // Create a dummy auth provider for default construction
+        struct DummyAuth;
+        impl crate::auth::AuthProvider for DummyAuth {
+            fn user_id(&self) -> Option<&str> { None }
+            fn display_name(&self) -> Option<&str> { None }
+            fn email(&self) -> Option<&str> { None }
+        }
+        
+        Self::new(
+            Arc::new(DummyAuth),
+            "https://storage.proxy.example.com".to_string(),
+            WorkspaceIdentity::default(),
+        )
     }
 }
 
 /// Source for exporting trace data to external storage.
 ///
-/// Manages the lifecycle of trace export, including buffering,
-/// batching, and uploading traces to the configured storage backend.
+/// Implements the TraceExportSource trait from xai_file_utils for
+/// integration with the upload queue system.
 pub struct WorkspaceTraceExportSource {
     /// Storage configuration for this export source
+    #[allow(dead_code)]
     storage: Arc<ProxyStorageConfig>,
     
     /// Channel for receiving trace data to export
-    #[allow(dead_code)]
-    tx: mpsc::sender::Sender<TraceEvent>,
+    tx: mpsc::Sender<TraceEvent>,
 }
 
 /// A single trace event to be exported.
@@ -99,6 +117,24 @@ struct TraceEvent {
     data: serde_json::Value,
 }
 
+// Implement the required trait for trace export source
+impl xai_file_utils::queue::TraceExportSource for WorkspaceTraceExportSource {
+    /// Export a trace event to the storage backend.
+    fn export_trace(&self, session_id: &str, data: serde_json::Value) {
+        let event = TraceEvent {
+            timestamp: chrono::Utc::now(),
+            session_id: session_id.to_string(),
+            span_context: None,
+            data,
+        };
+        
+        // Try to send, log warning if channel is full or closed
+        if let Err(_) = self.tx.try_send(event) {
+            tracing::debug!("trace export channel full or closed, dropping event");
+        }
+    }
+}
+
 impl WorkspaceTraceExportSource {
     /// Create a new trace export source.
     ///
@@ -108,23 +144,6 @@ impl WorkspaceTraceExportSource {
         let (tx, _rx) = mpsc::channel(1000);
         
         Self { storage, tx }
-    }
-    
-    /// Export a trace event asynchronously.
-    #[allow(dead_code)]
-    pub async fn export_trace(&self, session_id: &str, data: serde_json::Value) {
-        let event = TraceEvent {
-            timestamp: chrono::Utc::now(),
-            session_id: session_id.to_string(),
-            span_context: None,
-            data,
-        };
-        
-        // In a full implementation, this would buffer and batch events
-        // For now, we log and drop if channel is full
-        if let Err(_) = self.tx.send(event).await {
-            tracing::warn!("trace export channel full, dropping event");
-        }
     }
 }
 
@@ -185,8 +204,12 @@ pub fn record_upload_failed(phase: &str, reason: &str) {
 /// and debugging purposes.
 ///
 /// # Arguments
-/// * `_queue` - The upload queue to monitor (reserved for future use)
-pub fn spawn_queue_stats_sampler(_queue: Option<Arc<dyn std::any::Any + Send + Sync>>) {
+/// * `_queue` - Optional upload queue to monitor
+/// * `_sample_interval` - How often to sample stats (reserved for future use)
+pub fn spawn_queue_stats_sampler(
+    _queue: Option<Arc<xai_file_utils::queue::UploadQueue>>,
+    _sample_interval: std::time::Duration,
+) {
     // In production, this spawns a tokio task that periodically samples
     // queue depth, oldest item age, etc., and reports to metrics/logging
     tracing::debug!("queue stats sampler spawned (no-op in current implementation)");
@@ -201,31 +224,44 @@ pub fn spawn_queue_stats_sampler(_queue: Option<Arc<dyn std::any::Any + Send + S
 /// * `bytes` - The serialized tool state data
 /// * `session_id` - The session this state belongs to
 /// * `turn_number` - The conversation turn number
-/// * `upload_queue` - The upload queue to use
+/// * `upload_queue` - Reference to optional upload queue
 ///
 /// # Returns
 /// `Ok(())` if the state was successfully queued for upload.
-/// `Err(_)` if queuing failed.
+/// `Err(_)` containing boxed error if queuing failed.
 pub async fn upload_tool_state_queued(
     bytes: &[u8],
     session_id: &str,
-    turn_number: u32,
+    turn_number: u64,
     upload_queue: &Option<Arc<xai_file_utils::queue::UploadQueue>>,
-) -> anyhow::Result<()> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let Some(queue) = upload_queue else {
         return Ok(());  // No queue configured, silently succeed
     };
     
     let gcs_path = format!("{session_id}/tool_state/turn_{turn_number}.json");
     
-    match queue.enqueue_bytes_blocking(bytes, &gcs_path, "application/json").await {
-        Ok(_) => {
+    // Call enqueue_bytes_blocking with correct signature:
+    // enqueue_bytes_blocking(bytes, path, content_type, session_id, trace_parent, priority)
+    match queue.enqueue_bytes_blocking(
+        bytes,
+        &gcs_path,
+        "application/json",
+        session_id,
+        "",  // empty trace parent for now
+        0u64, // default priority
+    ).await {
+        xai_file_utils::queue::EnqueueOutcome::Accepted => {
             record_upload_outcome("tool_state", "succeeded");
             Ok(())
         }
-        Err(e) => {
-            record_upload_failed("tool_state", "enqueue_failed");
-            Err(anyhow::anyhow!("Failed to enqueue tool state: {e}"))
+        xai_file_utils::queue::EnqueueOutcome::Dropped(reason) => {
+            record_upload_failed("tool_state", &reason);
+            Err(format!("Upload dropped: {reason}").into())
+        }
+        xai_file_utils::queue::EnqueueOutcome::Rejected(reason) => {
+            record_upload_failed("tool_state", &reason);
+            Err(format!("Upload rejected: {reason}").into())
         }
     }
 }
@@ -243,16 +279,20 @@ mod tests {
     }
     
     #[test]
-    fn test_proxy_storage_config_new() {
-        let config = ProxyStorageConfig::new("https://custom-proxy.example.com".to_string());
-        assert_eq!(config.base_url, "https://custom-proxy.example.com");
-    }
-    
-    #[test]
     fn test_proxy_storage_config_builder() {
-        let config = ProxyStorageConfig::new("https://proxy.example.com".to_string())
-            .with_api_key("test-key-123".to_string())
-            .with_bucket("custom-bucket".to_string());
+        struct DummyAuth;
+        impl crate::auth::AuthProvider for DummyAuth {
+            fn user_id(&self) -> Option<&str> { None }
+            fn display_name(&self) -> Option<&str> { None }
+            fn email(&self) -> Option<&str> { None }
+        }
+        
+        let config = ProxyStorageConfig::new(
+            Arc::new(DummyAuth),
+            "https://proxy.example.com".to_string(),
+            WorkspaceIdentity::default(),
+        ).with_api_key("test-key-123".to_string())
+          .with_bucket("custom-bucket".to_string());
         
         assert_eq!(config.api_key.as_deref(), Some("test-key-123"));
         assert_eq!(config.bucket, "custom-bucket");

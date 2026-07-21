@@ -36,6 +36,7 @@ pub mod status_config;
 pub(crate) mod telemetry;
 pub use status_config::StatusConfig;
 pub mod trust;
+pub mod auth;
 pub(crate) mod upload;
 pub mod util;
 pub mod workspace_ops;
