@@ -177,7 +177,7 @@ impl AuthCommand {
                     if cfg.base_url.is_empty() { "(default)" } else { &cfg.base_url },
                     &cfg.api_key[..std::cmp::min(8, cfg.api_key.len())],
                     if cfg.configured_at.is_some() { 
-                        format!("\n  Configured: {}", cfg.configured_as_deref().unwrap_or("unknown")) 
+                        format!("\n  Configured: {}", cfg.configured_at.as_deref().unwrap_or("unknown")) 
                     } else { 
                         String::new() 
                     }
