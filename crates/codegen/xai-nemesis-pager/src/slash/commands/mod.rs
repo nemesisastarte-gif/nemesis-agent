@@ -5,6 +5,7 @@
 //! construction.
 pub mod always_approve;
 pub mod announcements;
+pub mod auth;
 pub mod auto;
 pub mod btw;
 pub mod cd;
@@ -130,6 +131,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(jump::JumpCommand),
         Arc::new(login::LoginCommand),
         Arc::new(logout::LogoutCommand),
+        Arc::new(auth::AuthCommand),
         Arc::new(import_claude::ImportClaudeCommand),
         Arc::new(usage::UsageCommand),
         Arc::new(queue::QueueCommand),

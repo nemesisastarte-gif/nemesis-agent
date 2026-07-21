@@ -460,7 +460,9 @@ pub async fn run(
                 xai_nemesis_shell::auth::GrokComConfig::default()
             }
         };
-    let refreshed_auth = xai_nemesis_shell::auth::try_ensure_fresh_auth(&grok_com_config).await;
+    // NEMESIS: Skip automatic auth at startup - user configures via /auth command
+    // Original: let refreshed_auth = xai_nemesis_shell::auth::try_ensure_fresh_auth(&grok_com_config).await;
+    let refreshed_auth: Option<xai_nemesis_shell::auth::GrokAuth> = None;
     let early_prefetch =
         xai_nemesis_shell::agent::models::start_early_prefetch_with_auth(refreshed_auth);
     xai_nemesis_shell::agent::mvp_agent::warm_async_http_client();
