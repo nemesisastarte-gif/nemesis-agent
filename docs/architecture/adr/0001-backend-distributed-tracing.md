@@ -1,189 +1,261 @@
-# ADR-0001：NemesisCode Backend 分布式追踪
+# ADR-0001 : Traçage distribué du backend NemesisCode
 
-- 状态：已接受
-- 日期：2026-07-16
-- 决策者：NemesisCode 团队
+- Statut : accepté
+- Date : 2026-07-16
+- Décideurs : équipe NemesisCode
 
-## 背景
+## Contexte
 
-NemesisCode Backend 是用户任务进入服务端后的业务入口，并通过 HTTP、WebSocket 等方式调用 Taskflow。当前排障主要依赖业务日志以及 `task_id`、`session_id`、`request_id` 等字段，无法稳定还原一次操作在 NemesisCode 与 Taskflow 之间的技术因果关系。
+Le backend NemesisCode est le point d'entrée métier des tâches utilisateur
+côté serveur, et il appelle Taskflow via HTTP, WebSocket, etc. Le dépannage
+repose aujourd'hui principalement sur les journaux métier et les champs
+`task_id`, `session_id`, `request_id`, ce qui ne permet pas de reconstituer de
+manière fiable la chaîne de causalité technique d'une opération entre
+NemesisCode et Taskflow.
 
-本次建设从 NemesisCode Backend 开始，不改动 Web、Desktop、Mobile，也不改动 VM Agent 或 Coding Agent。客户端请求进入 NemesisCode 后创建新的 Trace；Taskflow 到 Agent 的交互由 Taskflow 记录为黑盒边界。
+Ce chantier démarre par le backend NemesisCode, sans modifier Web, Desktop,
+Mobile, ni les agents VM ou les coding agents. Une requête client qui entre
+dans NemesisCode crée une nouvelle trace ; les interactions de Taskflow avec
+l'agent sont enregistrées par Taskflow comme une frontière boîte noire.
 
-## 决策
+## Décision
 
-采用 OpenTelemetry 和 W3C Trace Context 建设 NemesisCode Backend 到 Taskflow 的分布式追踪。一个 NemesisCode 任务不是一条持续数小时的 Trace，而是由多条短生命周期 Trace 组成，并通过 `nemesiscode.task.id` 聚合。同步调用使用父子 Span，异步阶段使用 Span Link。
+Mettre en place un traçage distribué de NemesisCode Backend vers Taskflow avec
+OpenTelemetry et le W3C Trace Context. Une tâche NemesisCode n'est pas une
+trace unique durant des heures, mais un ensemble de traces à courte durée de
+vie, agrégées via `nemesiscode.task.id`. Les appels synchrones utilisent des
+spans parent-enfant ; les phases asynchrones utilisent des liens de span.
 
 ```text
-公网客户端
-    │ 不信任外部 traceparent
+Client public
+    │  ne pas faire confiance au traceparent externe
     ▼
-NemesisCode Backend ── traceparent ──▶ Taskflow ──▶ Agent 黑盒边界
+Backend NemesisCode ── traceparent ──▶ Taskflow ──▶ frontière boîte noire Agent
     ▲                                  │
-    └──────── traceparent ─────────────┘
-                 回调
+    └────────── traceparent ───────────┘
+                    rappel
 
-NemesisCode / Taskflow ── OTLP ──▶ OpenTelemetry Collector ──▶ Tempo
-NemesisCode / Taskflow ── structured logs ──▶ VictoriaLogs
+NemesisCode / Taskflow ── OTLP ──▶ Collecteur OpenTelemetry ──▶ Tempo
+NemesisCode / Taskflow ── journaux structurés ──▶ VictoriaLogs
 ```
 
-### Trace 入口与信任边界
+### Entrées de trace et frontières de confiance
 
-- NemesisCode 的公网业务接口忽略客户端传入的 `traceparent` 和 `tracestate`，创建新的根 Trace。
-- 未来若由受控网关创建 Trace，只能信任经过网关清洗并重新注入的上下文。
-- Taskflow 内部回调端点允许提取经过认证的 Taskflow Trace Context。
-- 不使用 OpenTelemetry Baggage 传播业务字段。
+- Les interfaces publiques de NemesisCode ignorent les `traceparent` et
+  `tracestate` envoyés par les clients et créent une nouvelle trace racine.
+- À l'avenir, si une passerelle contrôlée crée des traces, seul un contexte
+  nettoyé et réinjecté par la passerelle sera digne de confiance.
+- Les points de rappel internes de Taskflow peuvent extraire le contexte de
+  trace Taskflow authentifié.
+- Le Baggage OpenTelemetry n'est pas utilisé pour propager des champs métier.
 
-### 传播规则
+### Règles de propagation
 
-- NemesisCode 调用 Taskflow 时，通过 W3C `traceparent` 和 `tracestate` 传播上下文。
-- HTTP 使用标准 Header；WebSocket 仅在握手阶段传播连接上下文。
-- Token、日志片段、终端字节流和心跳不逐条创建 Span。
-- `task_id`、`session_id`、`request_id`、`vm_id` 继续通过现有参数和消息体传递，由两端写入 Span 属性与结构化日志。
-- Taskflow 发起的异步回调形成新的 Trace，NemesisCode 将回调处理作为该 Trace 的下游 Span。
+- Lorsque NemesisCode appelle Taskflow, le contexte est propagé via les
+  en-têtes W3C `traceparent` et `tracestate`.
+- HTTP utilise les en-têtes standard ; WebSocket ne propage le contexte qu'à
+  la phase de poignée de main.
+- Tokens, fragments de journaux, flux d'octets du terminal et battements de
+  cœur ne créent pas de span par élément.
+- `task_id`, `session_id`, `request_id`, `vm_id` continuent de transiter par
+  les paramètres et corps de messages existants ; les deux côtés les écrivent
+  en attributs de span et en journaux structurés.
+- Les rappels asynchrones initiés par Taskflow forment une nouvelle trace ;
+  NemesisCode traite le rappel comme un span aval de cette trace.
 
-### Span 粒度
+### Granularité des spans
 
-只追踪跨边界调用和关键业务阶段，不为普通 Go 函数创建 Span。
+Seuls les appels transfrontières et les étapes métier critiques sont tracés ;
+aucun span n'est créé pour les fonctions Go ordinaires.
 
-NemesisCode 的核心 Span 包括：
+Les spans principaux de NemesisCode incluent :
 
-- 接收任务创建、启动、停止、重启和模型切换请求；
-- 用户、项目、模型与配额校验；
-- 创建或更新任务记录；
-- 调用 Taskflow；
-- 建立 Task Live、Control、Terminal 等长连接；
-- 接收 Taskflow 回调；
-- 数据库、Redis 和外部服务调用。
+- la réception des requêtes de création, démarrage, arrêt, redémarrage et
+  changement de modèle de tâche ;
+- la validation utilisateur, projet, modèle et quota ;
+- la création ou la mise à jour de l'enregistrement de tâche ;
+- l'appel à Taskflow ;
+- l'établissement des connexions longues (Task Live, Control, Terminal) ;
+- la réception des rappels Taskflow ;
+- les appels à la base de données, Redis et aux services externes.
 
-健康检查、心跳、轮询和流式数据块默认不产生业务 Span。
+Les health checks, battements de cœur, sondages et blocs de données de flux ne
+produisent par défaut aucun span métier.
 
-### 属性规范
+### Spécification des attributs
 
-优先采用 OpenTelemetry Semantic Conventions。自定义属性使用以下名称：
+Privilégier les Semantic Conventions OpenTelemetry. Les attributs personnalisés
+utilisent les noms suivants :
 
-| 属性 | 含义 |
+| Attribut | Signification |
 | --- | --- |
-| `nemesiscode.task.id` | NemesisCode 任务 ID |
-| `nemesiscode.agent.session.id` | 一次 Agent 执行会话 ID |
-| `nemesiscode.request.id` | 一次业务命令或交互 ID |
-| `nemesiscode.project.id` | NemesisCode 项目 ID |
-| `taskflow.vm.id` | Taskflow 虚拟机 ID |
-| `taskflow.terminal.session.id` | 终端会话 ID |
-| `task.outcome` | `succeeded`、`failed`、`cancelled` 或 `rejected` |
+| `nemesiscode.task.id` | ID de tâche NemesisCode |
+| `nemesiscode.agent.session.id` | ID d'une session d'exécution de l'agent |
+| `nemesiscode.request.id` | ID d'une commande ou interaction métier |
+| `nemesiscode.project.id` | ID de projet NemesisCode |
+| `taskflow.vm.id` | ID de machine virtuelle Taskflow |
+| `taskflow.terminal.session.id` | ID de session terminal |
+| `task.outcome` | `succeeded`, `failed`, `cancelled` ou `rejected` |
 
-现有业务字段、协议字段和数据库字段保持不变，仅在遥测层统一命名。
+Les champs métier, protocoles et bases de données existants restent inchangés ;
+la normalisation des noms n'a lieu qu'au niveau de la télémétrie.
 
-### 数据安全
+### Sécurité des données
 
-Trace 属性采用严格允许名单。允许采集服务名、版本、环境、路由模板、方法、状态码、规范化业务 ID、操作阶段、重试次数和清洗后的错误分类。
+Les attributs de trace suivent une liste blanche stricte. Sont autorisés : nom
+du service, version, environnement, modèle de routage, méthode, code de
+statut, identifiants métier normalisés, étape d'opération, nombre de tentatives
+et catégorie d'erreur assainie.
 
-以下内容禁止进入 Trace：
+Les éléments suivants sont interdits dans les traces :
 
-- Prompt、模型回复、代码、文件内容和完整文件路径；
-- 请求体、响应体和 URL 查询参数；
-- Git 仓库地址；
-- Authorization、Cookie、Token 和密钥；
-- 用户名、邮箱、手机号和客户端 IP；
-- SQL 参数、Redis Key 和 Value；
-- 可能包含第三方响应正文的原始错误信息。
+- prompts, réponses de modèles, code, contenu de fichiers et chemins de
+  fichiers complets ;
+- corps de requêtes/réponses et paramètres d'URL ;
+- URL des dépôts Git ;
+- Authorization, cookies, tokens et clés secrètes ;
+- noms d'utilisateur, e-mails, numéros de téléphone et IP clientes ;
+- paramètres SQL, clés et valeurs Redis ;
+- messages d'erreur bruts pouvant contenir le corps de réponses tierces.
 
-数据库 Span 只保留操作类型、表名、耗时和错误分类；Redis Span 只保留命令名。
+Les spans de base de données ne conservent que le type d'opération, le nom de
+table, la durée et la catégorie d'erreur ; les spans Redis ne conservent que le
+nom de commande.
 
-### 日志关联
+### Corrélation des journaux
 
-服务运行日志继续写入 VictoriaLogs，不引入 Loki 作为运行日志后端。日志处理器从 `context.Context` 提取并补充：
+Les journaux d'exécution du service continuent d'être écrits dans
+VictoriaLogs ; Loki n'est pas introduit comme backend de journaux
+d'exécution. Le handler de journaux extrait et complète depuis le
+`context.Context` :
 
-- `trace_id`；
-- `span_id`；
-- `nemesiscode.task.id`；
-- `nemesiscode.agent.session.id`；
-- `nemesiscode.request.id`；
-- `service.name`。
+- `trace_id` ;
+- `span_id` ;
+- `nemesiscode.task.id` ;
+- `nemesiscode.agent.session.id` ;
+- `nemesiscode.request.id` ;
+- `service.name`.
 
-Grafana 必须支持从 VictoriaLogs 日志按 `trace_id` 打开 Tempo Trace，也支持从 Tempo 按 `trace_id` 和时间范围查询 VictoriaLogs。
+Grafana doit pouvoir ouvrir une trace Tempo depuis un journal VictoriaLogs via
+`trace_id`, et interroger VictoriaLogs depuis Tempo via `trace_id` et une
+fenêtre temporelle.
 
-Taskflow 中用于任务输出流的 Loki 业务能力不属于本次迁移范围。
+La capacité métier Loki utilisée par Taskflow pour les flux de sortie de
+tâches ne fait pas partie de cette migration.
 
-### 错误语义
+### Sémantique des erreurs
 
-- 系统异常、网络失败、超时、数据库失败和 Taskflow 调度失败标记为 `Error`。
-- HTTP 5xx 与 gRPC `Internal`、`Unavailable`、`DeadlineExceeded` 标记为 `Error`。
-- 用户主动取消记录 `task.outcome=cancelled`，不标记系统错误。
-- 参数校验失败、未授权、配额不足和并发上限记录 `task.outcome=rejected` 及规范化原因，不标记系统错误。
-- 原始错误正文不进入 Trace。
+- Exceptions système, échecs réseau, dépassements de délai, échecs base de
+  données et échecs d'ordonnancement Taskflow → marqués `Error`.
+- HTTP 5xx et gRPC `Internal`, `Unavailable`, `DeadlineExceeded` → marqués
+  `Error`.
+- Annulation explicite par l'utilisateur → `task.outcome=cancelled`, sans
+  marquage d'erreur système.
+- Échec de validation des paramètres, non-autorisation, quota insuffisant et
+  limite de concurrence atteinte → `task.outcome=rejected` avec raison
+  normalisée, sans marquage d'erreur système.
+- Le corps d'erreur brut n'entre pas dans les traces.
 
-### 导出与故障隔离
+### Export et isolation de panne
 
-- 使用异步批量导出器，通过 OTLP 上报 OpenTelemetry Collector。
-- Collector Endpoint 未配置或追踪关闭时使用 Noop Provider。
-- 队列有界；队列满、网络阻塞或 Collector 不可用时丢弃 Trace，不阻塞业务。
-- 应用关闭时限时 Flush，超时后继续退出。
-- 导出失败、丢弃 Span 和队列使用率通过 Prometheus 暴露，并对错误日志限频。
+- Exportateur asynchrone par lots vers le collecteur OpenTelemetry via OTLP.
+- Provider Noop lorsque l'endpoint du collecteur n'est pas configuré ou que le
+  traçage est désactivé.
+- File d'attente bornée ; en cas de file pleine, de blocage réseau ou de
+  collecteur indisponible, les traces sont abandonnées sans bloquer le métier.
+- Flush borné dans le temps à l'arrêt de l'application, puis sortie.
+- Les échecs d'export, les spans abandonnés et l'utilisation de la file sont
+  exposés via Prometheus, avec limitation du débit des journaux d'erreur.
 
-优先使用 OpenTelemetry 标准环境变量配置导出地址、协议、服务名、环境和资源属性。应用配置只补充启停开关与无法由标准变量表达的限制。
+Privilégier les variables d'environnement OpenTelemetry standard pour
+configurer l'adresse d'export, le protocole, le nom du service, l'environnement
+et les attributs de ressource. La configuration applicative n'ajoute que
+l'interrupteur on/off et les limites que les variables standard ne peuvent pas
+exprimer.
 
-### 采样与保留
+### Échantillonnage et rétention
 
-应用将候选 Span 发送给 Collector，由 Collector 执行尾部采样：
+L'application envoie les spans candidats au collecteur, qui applique
+l'échantillonnage de queue :
 
-- 开发、测试环境保留 100%；
-- 生产正常请求保留 10%；
-- 错误、超时、关键任务操作和慢请求保留 100%；
-- 健康检查、心跳和轮询默认丢弃；
-- HTTP 慢请求初始阈值为 2 秒，其他操作使用独立阈值。
+- environnements de dev/test : rétention 100 % ;
+- production, requêtes normales : rétention 10 % ;
+- erreurs, dépassements de délai, opérations de tâche critiques et requêtes
+  lentes : rétention 100 % ;
+- health checks, battements de cœur et sondages : abandon par défaut ;
+- seuil initial des requêtes HTTP lentes : 2 secondes ; les autres opérations
+  utilisent des seuils dédiés.
 
-生产 Trace 保留 7 天，测试环境保留 3 天，本地开发保留 24 小时。VictoriaLogs 继续使用现有保留策略。
+Rétention des traces : 7 jours en production, 3 jours en test, 24 heures en
+développement local. VictoriaLogs conserve sa politique de rétention actuelle.
 
-### 性能预算
+### Budget de performance
 
-- HTTP P95 额外延迟不超过 5 ms；
-- 应用 CPU 增量不超过 3%；
-- 单实例遥测队列内存上限 64 MiB；
-- WebSocket 和 gRPC 长连接吞吐下降不超过 2%；
-- 不增加请求路径中的同步遥测网络调用；
-- Collector 故障时业务接口和长连接不得明显恶化。
+- Surcoût supplémentaire HTTP P95 ≤ 5 ms ;
+- augmentation CPU applicative ≤ 3 % ;
+- mémoire maximale de la file télémétrique par instance : 64 Mio ;
+- débit des connexions longues WebSocket et gRPC : dégradation ≤ 2 % ;
+- aucun appel réseau télémétrique synchrone dans le chemin des requêtes ;
+- en cas de panne du collecteur, interfaces métier et connexions longues ne
+  doivent pas se dégrader de façon perceptible.
 
-### 上线顺序
+### Ordre de mise en service
 
-1. 部署 Collector、Tempo 和 Grafana 数据源，配置 VictoriaLogs 双向跳转。
-2. Taskflow 上线接收端埋点和日志关联，默认关闭导出。
-3. NemesisCode 上线服务端埋点与 Taskflow 上下文传播。
-4. 测试环境 100% 开启并完成验收。
-5. 生产单实例或小流量开启，观察性能和导出健康度。
-6. 满足性能预算后全量启用生产采样策略。
+1. Déployer le collecteur, Tempo et la source de données Grafana ; configurer
+   la navigation bidirectionnelle VictoriaLogs.
+2. Taskflow : instrumentation des points de réception et corrélation des
+   journaux, export désactivé par défaut.
+3. NemesisCode : instrumentation serveur et propagation du contexte vers
+   Taskflow.
+4. Activer 100 % en test et valider l'acceptation.
+5. Activer en production sur une instance ou un petit flux, surveiller les
+   performances et la santé de l'export.
+6. Une fois le budget de performance respecté, activer la politique
+   d'échantillonnage de production complète.
 
-### 验收标准
+### Critères d'acceptation
 
-- 正常创建任务可看到 NemesisCode 接入、数据操作、Taskflow 调用和调度阶段；
-- Taskflow 异步结果可通过 Span Link 和 `task_id` 关联到创建阶段；
-- Taskflow 不可用、VM 创建失败和 Agent 超时正确保留并标记错误；
-- 用户取消和业务拒绝不会误报为系统错误；
-- WebSocket 重连形成独立连接 Span，并可通过业务 ID 聚合；
-- VictoriaLogs 与 Tempo 可以双向跳转；
-- Collector 停止时业务功能、延迟和长连接保持正常；
-- Trace 中不存在禁止采集的数据；
-- 性能测试满足既定预算。
+- La création normale d'une tâche montre l'arrivée NemesisCode, les opérations
+  de données, l'appel Taskflow et la phase d'ordonnancement ;
+- les résultats asynchrones de Taskflow peuvent être reliés à la phase de
+  création via les liens de span et `task_id` ;
+- l'indisponibilité de Taskflow, l'échec de création de VM et le dépassement
+  de délai de l'agent sont correctement conservés et marqués comme erreurs ;
+- l'annulation utilisateur et les refus métier ne sont pas signalés à tort
+  comme erreurs système ;
+- une reconnexion WebSocket forme un span de connexion distinct, agrégable par
+  identifiant métier ;
+- VictoriaLogs et Tempo permettent la navigation bidirectionnelle ;
+- collecteur arrêté : fonctionnalités métier, latences et connexions longues
+  restent normales ;
+- aucune donnée interdite dans les traces ;
+- les tests de performance respectent le budget défini.
 
-## 影响
+## Impacts
 
-### 正面影响
+### Impacts positifs
 
-- 可以从 `trace_id` 还原一次同步调用，也可以从 `task_id` 聚合长生命周期任务的多条 Trace。
-- 日志与 Trace 形成统一排障入口。
-- Agent 无需改动，降低协议和发布风险。
-- 遥测故障与业务故障隔离。
+- Depuis `trace_id`, on peut reconstituer un appel synchrone ; depuis
+  `task_id`, on peut agréger les multiples traces d'une tâche à longue durée
+  de vie.
+- Journaux et traces forment une entrée de dépannage unifiée.
+- L'agent n'est pas modifié : risque de protocole et de livraison réduit.
+- Les pannes de télémétrie sont isolées des pannes métier.
 
-### 代价
+### Coûts
 
-- 需要维护 Collector、Tempo、采样规则和 Grafana 配置。
-- 异步关联需要 Taskflow 持久化起始 Trace Context。
-- 关键异步代码必须正确传递 `context.Context`，日志才能自动关联。
-- 尾部采样会增加 Collector 的入口流量与短期内存压力。
+- Maintenance du collecteur, de Tempo, des règles d'échantillonnage et de la
+  configuration Grafana.
+- La corrélation asynchrone exige que Taskflow persiste le contexte de trace
+  initial.
+- Le code asynchrone critique doit propager correctement le `context.Context`
+  pour que les journaux se corrèlent automatiquement.
+- L'échantillonnage de queue augmente le trafic entrant du collecteur et la
+  pression mémoire à court terme.
 
-## 不在本次范围
+## Hors périmètre
 
-- Web、Desktop、Mobile 客户端埋点；
-- VM Agent、Coding Agent 内部追踪或协议修改；
-- 业务任务日志从 Loki 迁移到 VictoriaLogs；
-- 在应用仓库内维护生产级 Tempo 集群。
+- Instrumentation des clients Web, Desktop, Mobile ;
+- traçage interne ou modification de protocole des agents VM / coding agents ;
+- migration des journaux métier de tâches de Loki vers VictoriaLogs ;
+- maintenance d'un cluster Tempo de niveau production dans ce dépôt.

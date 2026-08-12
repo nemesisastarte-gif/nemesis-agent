@@ -1,154 +1,203 @@
 # NemesisCode
 
 <p align="center">
-  <img src="./frontend/public/logo-dark.png" alt="NemesisCode" width="200" />
+  <img src="./frontend/public/logo-colored.png" alt="NemesisCode" width="200" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/teteekoue/NemesisCode/actions/workflows/build.yml"><img src="https://github.com/teteekoue/NemesisCode/actions/workflows/build.yml/badge.svg" alt="Service Images" /></a>
-  <a href="https://github.com/teteekoue/NemesisCode/actions/workflows/electron-release.yml"><img src="https://github.com/teteekoue/NemesisCode/actions/workflows/electron-release.yml/badge.svg" alt="Client Release" /></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0" /></a>
+  <em>L'aigle de la justice — votre assistant de développement IA, sur votre machine.</em>
 </p>
 
 <p align="center">
-  <a href="https://monkeycode-ai.net/">Try Online</a> ·
-  <a href="#self-hosted-deployment">Self-Hosted Deployment</a> ·
-  <a href="https://discord.gg/2pPmuyr4pP">Discord</a> ·
-  <a href="https://monkeycode-ai.gallery/">Community Gallery</a> ·
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/licence-AGPL--3.0-blue.svg" alt="Licence : AGPL-3.0" /></a>
+  <a href="./docs/README.md"><img src="https://img.shields.io/badge/docs-français-green.svg" alt="Documentation" /></a>
   <a href="./readme.cn.md">中文</a>
 </p>
 
-## What Is NemesisCode?
+---
 
-NemesisCode is an open-source **enterprise-grade AI development platform** with built-in development environment management, AI model management, AI task management, and project requirement management. Unlike typical vibe coding tools, NemesisCode is designed as an AI assistant for professional engineering teams.
+## Qu'est-ce que NemesisCode ?
 
-- You can deploy NemesisCode inside your **enterprise network** and share it with your R&D team, so developers can start development tasks quickly while engineering leaders manage AI development workflows centrally.
-- You can also use our **online environment** directly. It includes managed development environments, built-in large language models, and native mobile support, so you can use leading AI agents anywhere.
+**NemesisCode** est une plateforme de développement pilotée par l'IA, pensée
+pour un usage **personnel et en petite équipe**. Issue d'un fork de
+MonkeyCode, elle réunit dans une même interface :
 
-## Screenshots
+- la **création et le suivi de tâches IA** (développement, revue, débogage) ;
+- la **gestion de projets** et d'exigences (SPEC) ;
+- la **configuration de fournisseurs d'API** (OpenAI, NVIDIA NIM, Fireworks AI,
+  Cohere, DeepSeek, Ollama…) et la **sélection du modèle** par tâche ;
+- un **terminal, un explorateur de fichiers, les diffs Git, les skills et les
+  serveurs MCP** directement dans le navigateur ;
+- un **mode local** : la machine qui exécute le backend devient
+  l'environnement de développement de l'agent — aucune infrastructure cloud
+  requise.
+
+## Pourquoi NemesisCode ?
+
+- 🖥️ **Mode local** : lancez le backend sur votre machine (ou un petit serveur),
+  ouvrez le navigateur : l'agent travaille directement sur cette machine, dans
+  des espaces de travail dédiés (`~/.nemesiscode/workspaces/`).
+- 🔌 **Vos propres modèles** : configurez n'importe quel fournisseur compatible
+  OpenAI (ou Anthropic), y compris les endpoints privés, NVIDIA NIM,
+  Fireworks, Cohere… et les providers « Custom ».
+- 🔓 **Open source** : code complet et auditable sous licence AGPL-3.0.
+- 👥 **Collaboration** : projets, membres, rôles, review de PR/MR — pour une
+  petite équipe sans dépendre d'un service tiers.
+
+## Captures d'écran
 
 <table>
   <tr>
     <td align="center">
-      <img src="./frontend/public/nemesiscode-1.png" alt="NemesisCode AI task workspace" />
+      <img src="./frontend/public/nemesiscode-1.png" alt="Espace de travail de tâche IA" />
       <br />
-      <sub>AI Task Workspace</sub>
+      <sub>Espace de travail de tâche IA</sub>
     </td>
     <td align="center">
-      <img src="./frontend/public/nemesiscode-2.png" alt="NemesisCode cloud terminal and task execution" />
+      <img src="./frontend/public/nemesiscode-2.png" alt="Terminal et exécution de tâches" />
       <br />
-      <sub>Cloud Terminal and Task Execution</sub>
+      <sub>Terminal et exécution de tâches</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="./frontend/public/nemesiscode-3.png" alt="NemesisCode project collaboration and file management" />
+      <img src="./frontend/public/nemesiscode-3.png" alt="Collaboration projet et gestion de fichiers" />
       <br />
-      <sub>Project Collaboration and File Management</sub>
+      <sub>Collaboration projet et fichiers</sub>
     </td>
     <td align="center">
-      <img src="./frontend/public/nemesiscode-mobile.png" alt="NemesisCode mobile task and file management" />
+      <img src="./frontend/public/nemesiscode-mobile.png" alt="Tâches et fichiers sur mobile" />
       <br />
-      <sub>Mobile Task and File Management</sub>
+      <sub>Mobile : tâches et fichiers</sub>
     </td>
   </tr>
 </table>
 
-## Features
+## Fonctionnalités
 
-You do not need to assemble tools, set up environments, or jump between workflows. Give NemesisCode a requirement and it carries the work from development to validation, turning AI coding into a sustainable workflow.
+- **Tâches IA de bout en bout** : décrivez un besoin, l'agent le développe et
+  le valide (build, test, preview) dans l'environnement choisi.
+- **Environnements de développement** :
+  - *mode cloud* : environnements serveur gérés (architecture historique) ;
+  - *mode local* : la machine hôte du backend est l'environnement de l'agent.
+- **Modèles multi-fournisseurs** : OpenAI, NVIDIA NIM, Fireworks AI, Cohere,
+  DeepSeek, Moonshot/Kimi, SiliconFlow, Gemini, Hunyuan, Bailian, Volcengine,
+  Azure OpenAI, Ollama (local) et **Custom (format OpenAI)** — sélection par
+  tâche ou par défaut, liste des modèles récupérée depuis l'endpoint.
+- **Skills & MCP** : jeux de compétences et serveurs MCP configurables.
+- **Terminal web** : terminal interactif dans le navigateur, branché sur
+  l'environnement de la tâche (la machine hôte en mode local).
+- **Fichiers & diffs** : explorateur de fichiers, éditeur, diff Git par tâche.
+- **Projets & collaboration** : gestion de projets, membres, rôles, review
+  de PR/MR, tableaux de tâches.
+- **Mobile** : applications iOS/Android natives (Expo) synchronisées.
 
-- **Free to start**: No client download and no local environment setup. Open the browser, create an account, and start your first AI development task in seconds.
-- **Cloud development environments**: No dependency on a local development machine. Every task runs behind a real server-side environment, with build, test, and preview workflows completed in the cloud.
-- **Broad model support**: GLM, Kimi, MiniMax, Qwen, DeepSeek, and other mainstream models are integrated. You can switch by task type or select a model manually.
-- **Native mobile support**: Deep iOS and Android support keeps PC and mobile data in sync, so agents can continue running tasks while you are away from your desk.
-- **Fully open source**: The core code is public on GitHub. Anyone can audit, fork, and extend it while keeping control over technical choices and security policies.
-- **Private offline deployment**: Enterprises and teams with strict data privacy requirements can deploy NemesisCode inside their own networks and keep data local.
+## Démarrage rapide
 
-## Local Mode (machine hôte = environnement de dev)
+### Option A — Mode local (recommandé pour un usage personnel)
 
-NemesisCode peut fonctionner **sans aucune infrastructure cloud** : quand le
-backend démarre en mode local, la machine qui l'héberge devient
-l'environnement de développement de l'agent. Pas de taskflow, pas de VM
-conteneur, pas de rustfs — l'agent (moteur `ohmyagent`) tourne directement sur
-l'hôte dans `~/.nemesiscode/workspaces/<task>`.
-
-```bash
-# Backend en mode local (Postgres + Redis requis localement)
-MCAI_TASKFLOW_MODE=local \
-MCAI_DATABASE_MASTER="postgres://user:pass@127.0.0.1:5432/nemesiscode?sslmode=disable" \
-MCAI_REDIS_HOST=127.0.0.1 \
-MCAI_INIT_TEAM_EMAIL=admin@local MCAI_INIT_TEAM_PASSWORD=change-me \
-go run ./cmd/server
-```
-
-Variables utiles : `MCAI_TASKFLOW_LOCAL_WORKSPACE_ROOT`,
-`MCAI_TASKFLOW_LOCAL_AGENT_BIN`, `MCAI_TASKFLOW_LOCAL_SHELL`,
-`MCAI_TASKFLOW_LOCAL_HOST_ID`. Design complet : [docs/local-mode-design.md](./docs/local-mode-design.md).
-
-## Usage
-
-### Online
-
-Open NemesisCode Online to get started:
-
-[https://monkeycode-ai.net/](https://monkeycode-ai.net/)
-
-### Self-Hosted Deployment
-
-Recommended configuration:
-
-- NemesisCode console: at least `2C / 4 GB / 40 GB`
-- Development environment host: at least `8C / 16 GB / 100 GB`
-
-Online installation:
+Prérequis : Go 1.25+, Node 22+, pnpm, PostgreSQL et Redis accessibles
+localement (ou via le docker-compose, voir Option B).
 
 ```bash
-bash -c "$(curl -fsSL 'https://monkeycode-ai.com/online/install')"
+# 1. Backend — mode local
+cd backend
+export MCAI_TASKFLOW_MODE=local
+export MCAI_DATABASE_MASTER="postgres://user:pass@127.0.0.1:5432/nemesiscode?sslmode=disable"
+export MCAI_REDIS_HOST=127.0.0.1
+export MCAI_INIT_TEAM_EMAIL=admin@local
+export MCAI_INIT_TEAM_PASSWORD=change-me
+go run ./cmd/server          # écoute sur :8888
+
+# 2. Frontend — serveur de développement
+cd ../frontend
+pnpm install
+pnpm run dev:offline         # proxy /api vers le backend
 ```
 
-For more deployment methods, configuration details, and operations guidance, see the [deployment documentation](https://monkeycode.docs.baizhi.cloud/node/019eb0f3-9424-7c93-9489-4e584f989527).
+Ouvrez <http://localhost:5173>, connectez-vous avec le compte init-team, puis :
 
-## Comparison
+1. **Settings → AI models** → choisissez un **provider** (NVIDIA NIM,
+   Fireworks, Cohere, Custom…) → renseignez l'API token → la liste des modèles
+   du fournisseur est chargée automatiquement.
+2. Créez un **projet** (ou liez un dépôt Git), lancez une **tâche** : l'agent
+   s'exécute sur la machine hôte, dans `~/.nemesiscode/workspaces/<tâche>`.
+3. Utilisez le **terminal**, les **fichiers**, les **diffs** et les **skills**
+   dans l'interface web.
 
-| Dimension | NemesisCode | Cursor | Claude Code | Codex |
-|---|:---:|:---:|:---:|:---:|
-| Online usage | 🟢 | 🟢 | 🟢 | 🟢 |
-| Local IDE | 🔴 | 🟢 | 🟢 | 🟢 |
-| Local CLI | 🔴 | 🟢 | 🟢 | 🟢 |
-| Requirement and SPEC management | 🟢 | 🔴 | 🔴 | 🔴 |
-| Cloud development environment | 🟢 | 🟡 | 🟡 | 🟡 |
-| Code completion | 🔴 | 🟢 | 🔴 | 🔴 |
-| Automated PR / MR code review | 🟢 | 🟡 | 🟡 | 🟡 |
-| Team collaboration | 🟢 | 🔴 | 🔴 | 🔴 |
-| China model support | 🟢 | 🔴 | 🔴 | 🔴 |
-| Private deployment | 🟢 | 🔴 | 🔴 | 🔴 |
-| Open source | 🟢 | 🔴 | 🔴 | 🔴 |
+Variables utiles du mode local (préfixe `MCAI_`) :
 
-## Community and Support
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `MCAI_TASKFLOW_MODE` | `remote` | `local` pour utiliser la machine hôte comme environnement |
+| `MCAI_TASKFLOW_LOCAL_WORKSPACE_ROOT` | `~/.nemesiscode/workspaces` | racine des espaces de travail |
+| `MCAI_TASKFLOW_LOCAL_AGENT_BIN` | `ohmyagent` | binaire du moteur agent |
+| `MCAI_TASKFLOW_LOCAL_SHELL` | `$SHELL` | shell des terminaux web |
+| `MCAI_TASKFLOW_LOCAL_HOST_ID` | `local-<hostname>` | identifiant de l'hôte local |
 
-Join the community to discuss NemesisCode usage, deployment, and development with other developers.
+> ⚠️ Le moteur agent (`ohmyagent`) vit dans le sous-module `agent/`
+> (dépôt privé upstream). Sans lui, le backend fonctionne mais les tâches ne
+> peuvent pas démarrer. Design détaillé : [docs/local-mode-design.md](./docs/local-mode-design.md).
 
-<table>
-  <tr>
-    <td align="center"><img src="./frontend/public/wechat.png" width="160" /><br/>WeChat Group</td>
-    <td align="center"><img src="./frontend/public/feishu.png" width="160" /><br/>Feishu Group</td>
-    <td align="center"><img src="./frontend/public/dingtalk.png" width="160" /><br/>DingTalk Group</td>
-  </tr>
-</table>
+### Option B — Déploiement complet (docker-compose)
 
-You can also get support through:
+L'architecture historique complète (backend, base de données, redis,
+clickhouse, rustfs, ingress, frontend) peut être déployée avec le
+docker-compose de `backend/`. Le compose attend un jeu de variables
+d'environnement (images, mots de passe, `INSTALL_DIR`…) : voir le modèle
+d'installation dans `backend/templates/install.sh.tmpl`, ou lancez
+manuellement les services `db` et `redis` uniquement pour le mode local.
 
-- Documentation: [https://monkeycode.docs.baizhi.cloud/](https://monkeycode.docs.baizhi.cloud/)
-- Online service: [https://monkeycode-ai.net/](https://monkeycode-ai.net/)
-- Enterprise consultation: [https://baizhi.cloud/consult](https://baizhi.cloud/consult)
-- Discord: [https://discord.gg/2pPmuyr4pP](https://discord.gg/2pPmuyr4pP)
-- GitHub Issues: [https://github.com/teteekoue/NemesisCode/issues](https://github.com/teteekoue/NemesisCode/issues)
+## Configuration des fournisseurs d'API
 
-## Star History
+L'interface **Settings → AI models** (et **Manager → AI models** pour
+l'administrateur) permet de :
 
-[![Star History Chart](https://api.star-history.com/svg?repos=teteekoue/NemesisCode&type=Date)](https://star-history.com/#teteekoue/NemesisCode&Date)
+- choisir un **provider préconfiguré** : OpenAI, NVIDIA NIM, Fireworks AI,
+  Cohere, DeepSeek, Moonshot (Kimi), SiliconFlow, Gemini, Hunyuan, Bailian,
+  Volcengine, Azure OpenAI, Ollama… ;
+- utiliser un **provider Custom (format OpenAI)** : n'importe quel endpoint
+  compatible ;
+- récupérer automatiquement la **liste des modèles** de l'endpoint
+  (`GET {base}/models`) ou la saisir manuellement ;
+- vérifier la configuration (health-check) avant l'enregistrement ;
+- sélectionner le modèle par tâche via le sélecteur de l'interface.
 
-## License
+## Structure du dépôt
 
-NemesisCode is open source under the [GNU Affero General Public License v3.0](./LICENSE).
+| Dossier | Stack | Rôle |
+|---|---|---|
+| `backend/` | Go (Echo, ent, Redis, Postgres) | API serveur, tâches, modèles, mode local |
+| `frontend/` | React 19 + Vite + Tailwind | Interface web |
+| `desktop/` | Tauri (Rust) + React | Client desktop |
+| `mobile/` | React Native / Expo | Applications mobiles |
+| `browser-extension/` | TypeScript | Extension navigateur |
+| `agent/` | sous-module (upstream privé) | Moteur agent `ohmyagent` |
+| `docs/` | Markdown | Documentation (voir [docs/README.md](./docs/README.md)) |
+
+## Documentation
+
+- [Index de la documentation](./docs/README.md)
+- [Mode local — la machine hôte comme environnement de dev](./docs/local-mode-design.md)
+- [Historique du rebranding MonkeyCode → NemesisCode](./docs/rebranding.md)
+- [Architecture & observabilité](./docs/architecture/)
+
+## Feuille de route
+
+- [x] Rebranding NemesisCode (nom, logo, prompts, UI)
+- [x] Mode local backend (la machine hôte devient l'environnement de dev)
+- [x] Providers d'API configurables (NVIDIA NIM, Fireworks, Cohere, Custom…)
+- [ ] SQLite + Redis optionnel (machine nue type Termux, sans Docker)
+- [ ] Scripts de lancement one-shot et installation Termux/Linux
+- [ ] Alignement du protocole agent (`ohmyagent`) en mode local
+- [ ] Déploiement auto-hébergé de l'équipe
+
+## Licence
+
+NemesisCode est distribué sous licence
+[GNU Affero General Public License v3.0](./LICENSE) — voir le fichier LICENSE
+pour le texte complet.
+
+*Projet dérivé de [MonkeyCode](https://github.com/chaitin/MonkeyCode)
+(AGPL-3.0), avec l'ajout du mode local, des providers d'API configurables et
+du nouveau branding NemesisCode.*

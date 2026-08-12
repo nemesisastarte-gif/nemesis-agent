@@ -1,61 +1,67 @@
-# NemesisCode 可观测性术语表
+# Glossaire d'observabilité NemesisCode
 
-## 领域标识
+## Identifiants métier
 
-| 术语 | 遥测字段 | 定义 |
+| Terme | Champ télémétrique | Définition |
 | --- | --- | --- |
-| 任务 | `nemesiscode.task.id` | NemesisCode 中的长生命周期业务聚合。一个任务可关联多条 Trace |
-| Agent 执行会话 | `nemesiscode.agent.session.id` | 一次 Agent 执行上下文，不等同于终端会话 |
-| 业务请求 | `nemesiscode.request.id` | 一次命令、交互或请求响应配对标识，不等同于 Trace ID |
-| 项目 | `nemesiscode.project.id` | NemesisCode 项目标识 |
-| 虚拟机 | `taskflow.vm.id` | Taskflow 管理的执行环境标识 |
-| 终端会话 | `taskflow.terminal.session.id` | 一次终端连接会话，不等同于 Agent 执行会话 |
+| Tâche | `nemesiscode.task.id` | Agrégat métier à longue durée de vie dans NemesisCode. Une tâche peut être associée à plusieurs traces |
+| Session d'exécution de l'agent | `nemesiscode.agent.session.id` | Contexte d'une exécution de l'agent ; ne correspond pas à une session de terminal |
+| Requête métier | `nemesiscode.request.id` | Identifiant d'une paire commande/interaction/réponse ; ne correspond pas à un ID de trace |
+| Projet | `nemesiscode.project.id` | Identifiant de projet NemesisCode |
+| Machine virtuelle | `taskflow.vm.id` | Identifiant d'environnement d'exécution géré par Taskflow |
+| Session de terminal | `taskflow.terminal.session.id` | Une session de connexion terminal ; ne correspond pas à une session d'exécution de l'agent |
 
-现有协议和数据库中的 `task_id`、`session_id`、`request_id` 不重命名。写入 Trace 时必须映射到语义明确的规范字段。
+Les champs `task_id`, `session_id`, `request_id` existants dans les protocoles
+et la base de données **ne sont pas renommés**. Lors de l'écriture d'une trace,
+ils doivent être mappés vers les champs normalisés ci-dessus.
 
-## 追踪术语
+## Termes de traçage
 
-| 术语 | 定义 |
+| Terme | Définition |
 | --- | --- |
-| Trace | 一次有边界的技术调用链。一个 NemesisCode 任务通常包含多条 Trace |
-| Span | Trace 中的一个操作，例如处理 HTTP 请求或调用 Taskflow |
-| Trace Context | 由 `traceparent` 和 `tracestate` 表示的跨进程因果上下文 |
-| Span Link | 将异步 Trace 与先前 Trace 建立关系，不形成长期父子 Span |
-| Baggage | 可随 Trace Context 传播的业务数据容器。本设计不使用它传播业务 ID |
-| 根 Trace | 没有上游父 Span 的 Trace。NemesisCode 公网入口会创建新的根 Trace |
-| 连接 Span | 描述 WebSocket 或 gRPC 长连接建立、断开与重连的 Span，不覆盖全部流消息生命周期 |
-| 边界 Span | Taskflow 对 Agent 发送、等待或接收行为的观测。Agent 内部仍是黑盒 |
-| 尾部采样 | Collector 收到完整候选 Trace 后，根据错误、耗时和属性决定是否保留 |
+| Trace | Une chaîne d'appels techniques bornée. Une tâche MonkeyCode contient généralement plusieurs traces |
+| Span | Une opération d'une trace, par exemple le traitement d'une requête HTTP ou l'appel à Taskflow |
+| Contexte de trace | Causalité inter-processus représentée par `traceparent` et `tracestate` |
+| Lien de span | Associe une trace asynchrone à une trace antérieure, sans former une relation parent-enfant durable |
+| Baggage | Conteneur de données métier propagé avec le contexte de trace. Ce design ne l'utilise pas pour propager les ID métier |
+| Trace racine | Trace sans span parent en amont. L'entrée publique de NemesisCode crée une nouvelle trace racine |
+| Span de connexion | Décrit l'établissement, la fermeture et la reconnexion d'une connexion longue (WebSocket ou gRPC) ; ne couvre pas tout le cycle de vie des messages |
+| Span de frontière | Observation par Taskflow des envois, attentes et réceptions vers l'agent. L'intérieur de l'agent reste une boîte noire |
+| Échantillonnage de queue | Après réception des traces candidates complètes, le collecteur décide de les conserver selon erreurs, durées et attributs |
 
-## 存储与查询
+## Stockage et requêtes
 
-| 组件 | 职责 |
+| Composant | Rôle |
 | --- | --- |
-| OpenTelemetry SDK | 在 NemesisCode、Taskflow 进程内创建并批量导出 Span |
-| OpenTelemetry Collector | 接收 OTLP、执行尾部采样并转发 Trace |
-| Tempo | 存储 Trace 数据 |
-| VictoriaLogs | 存储 NemesisCode、Taskflow 的结构化运行日志 |
-| Grafana | 查询 Trace 和日志，提供二者之间的跳转入口 |
-| Loki 任务日志 | Taskflow 当前用于任务输出流的业务存储，不等同于服务运行日志 |
+| SDK OpenTelemetry | Crée et exporte les spans en lots dans les processus NemesisCode et Taskflow |
+| Collecteur OpenTelemetry | Reçoit l'OTLP, applique l'échantillonnage de queue et transmet les traces |
+| Tempo | Stocke les données de traces |
+| VictoriaLogs | Stocke les journaux structurés d'exécution de NemesisCode et Taskflow |
+| Grafana | Interroge traces et journaux, et fournit la navigation entre les deux |
+| Journaux de tâches Loki | Stockage métier actuel des flux de sortie des tâches par Taskflow ; distinct des journaux d'exécution du service |
 
-## 结果语义
+## Sémantique des résultats
 
-| 结果 | `task.outcome` | Span 状态 |
+| Résultat | `task.outcome` | Statut du span |
 | --- | --- | --- |
-| 成功 | `succeeded` | Unset |
-| 系统或执行失败 | `failed` | Error |
-| 用户主动取消 | `cancelled` | Unset |
-| 参数、权限、配额或并发限制拒绝 | `rejected` | Unset |
+| Succès | `succeeded` | Non défini |
+| Échec système ou d'exécution | `failed` | Erreur |
+| Annulation par l'utilisateur | `cancelled` | Non défini |
+| Refus (paramètres, permissions, quota, concurrence) | `rejected` | Non défini |
 
-## 信任边界
+## Frontières de confiance
 
-- 公网客户端传入的 Trace Context 默认不可信，NemesisCode 创建新的根 Trace。
-- 经过认证的 NemesisCode 到 Taskflow 请求可以传播 Trace Context。
-- 经过认证的 Taskflow 回调可以向 NemesisCode 传播 Trace Context。
-- Agent 不传播 Trace Context，本次不改动 Agent。
+- Le contexte de trace entrant d'un client public est **non fiable par
+  défaut** : NemesisCode crée une nouvelle trace racine.
+- Les requêtes authentifiées de NemesisCode vers Taskflow peuvent propager le
+  contexte de trace.
+- Les rappels authentifiés de Taskflow vers NemesisCode peuvent propager le
+  contexte de trace.
+- L'agent ne propage pas le contexte de trace ; il n'est pas modifié dans cette
+  itération.
 
-## 数据分类
+## Classification des données
 
-允许进入 Trace 的数据包括服务资源信息、路由模板、状态码、规范化业务 ID、耗时、重试次数和错误分类。
-
-Prompt、模型回复、代码、文件内容、完整路径、请求响应正文、查询参数、仓库地址、认证信息、个人信息、SQL 参数、Redis Key/Value 和原始第三方错误正文属于禁止采集数据。
+Les données admises dans une trace incluent : informations sur les ressources
+du service, modèles de routage, codes de statut, identifiants métier
+normalisés, durées, nombres de tentatives et catégories d'erreurs.
