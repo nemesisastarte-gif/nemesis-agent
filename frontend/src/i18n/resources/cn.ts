@@ -1119,6 +1119,7 @@ const cn = {
         confirm: "确认移除",
       },
       labels: {
+        provider: "API 提供商",
         interfaceType: "接口格式",
         baseUrl: "模型 API 地址",
         modelName: "模型名称",
@@ -1129,6 +1130,7 @@ const cn = {
         imageRecognition: "图片识别",
       },
       placeholders: {
+        provider: "请选择 API 提供商",
         interfaceType: "请选择接口格式类型",
         baseUrl: "请输入模型 API 地址",
         apiToken: "请输入 API Token",
@@ -1151,6 +1153,7 @@ const cn = {
       descriptionText: {
         apiUrlUnset: "未设置模型 API 地址",
         apiUrlInvalid: "模型地址不合法",
+        providerHint: "预设提供商：NVIDIA NIM、Fireworks AI、Cohere、OpenAI、DeepSeek 等。选择「Custom (OpenAI 格式)」可接入任意 OpenAI 兼容端点。",
         fetchFailedManual: "无法拉取模型列表，请按服务商文档填写模型 ID。",
         emptyManual: "当前未返回可用模型，请手动填写模型名称。",
         imageRecognition: "开启后，该模型可接收图片输入用于识别和分析。",
@@ -3357,6 +3360,9 @@ const cn = {
     form: {
       addTitle: "绑定 AI 大模型",
       editTitle: "修改 AI 大模型",
+      provider: "API 提供商",
+      providerPlaceholder: "请选择 API 提供商",
+      providerHint: "预设提供商：NVIDIA NIM、Fireworks AI、Cohere、OpenAI、DeepSeek 等。选择「Custom (OpenAI 格式)」可接入任意 OpenAI 兼容端点。",
       interfaceFormat: "接口格式",
       interfacePlaceholder: "请选择接口格式类型",
       modelApiUrl: "模型 API 地址",

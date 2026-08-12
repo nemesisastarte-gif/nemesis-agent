@@ -140,6 +140,9 @@ démarrage (`pkg/localhost.EnsureHost`, appelé depuis `cmd/server/main.go`) :
 ## Limites connues (v1)
 
 - Terminal sans PTY : pas de resize, pas de couleurs TUI avancées (pipes).
+  Le `Shell` local est *ctx-aware* : `BlockRead` se débloque quand le ctx du
+  handler WS est annulé (déconnexion navigateur), ce qui permet au handler de
+  retourner et de stopper proprement le process shell (`defer shell.Stop()`).
 - Pas d'isolation : l'agent tourne avec les droits de l'utilisateur qui lance
   le backend (c'est le principe du mode local — à réserver à une machine de
   confiance).

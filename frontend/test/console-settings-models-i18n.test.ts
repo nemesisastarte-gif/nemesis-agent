@@ -70,3 +70,23 @@ test("新增和编辑模型表单复用模型搜索组件", () => {
   assert.doesNotMatch(sourceFiles.addModel, /const getGroupedModels/);
   assert.doesNotMatch(sourceFiles.editModel, /const getGroupedModels/);
 });
+
+test("模型表单提供 API 提供商预设（NVIDIA NIM / Fireworks / Cohere / Custom）", () => {
+  assert.match(sourceFiles.addModel, /NVIDIA NIM/);
+  assert.match(sourceFiles.addModel, /Fireworks AI/);
+  assert.match(sourceFiles.addModel, /Cohere/);
+  assert.match(sourceFiles.addModel, /Custom \(OpenAI format\)/);
+  assert.match(sourceFiles.addModel, /integrate\.api\.nvidia\.com/);
+  assert.match(sourceFiles.addModel, /api\.fireworks\.ai/);
+  assert.match(sourceFiles.addModel, /api\.cohere\.com\/compatibility\/v1/);
+  assert.match(sourceFiles.addModel, /applyProviderPreset/);
+  assert.match(sourceFiles.addModel, /consoleSettings\.models\.labels\.provider/);
+  assert.match(sourceFiles.addModel, /consoleSettings\.models\.placeholders\.provider/);
+});
+
+test("API 提供商字段提供中英文资源", () => {
+  assert.equal(cn.consoleSettings.models.labels.provider, "API 提供商");
+  assert.equal(en.consoleSettings.models.labels.provider, "API provider");
+  assert.equal(cn.consoleSettings.models.placeholders.provider, "请选择 API 提供商");
+  assert.equal(en.consoleSettings.models.placeholders.provider, "Select an API provider");
+});

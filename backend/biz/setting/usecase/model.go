@@ -232,7 +232,8 @@ func (u *modelUsecase) GetProviderModelList(ctx context.Context, req *domain.Get
 	}
 	switch req.Provider {
 	case consts.ModelProviderAzureOpenAI,
-		consts.ModelProviderVolcengine:
+		consts.ModelProviderVolcengine,
+		consts.ModelProviderCohere:
 		return &domain.GetProviderModelListResp{
 			Models: domain.ModelProviderBrandModelsList[req.Provider],
 		}, nil
@@ -243,7 +244,10 @@ func (u *modelUsecase) GetProviderModelList(ctx context.Context, req *domain.Get
 		consts.ModelProviderSiliconFlow,
 		consts.ModelProviderBaiZhiCloud,
 		consts.ModelProviderBaiLian,
-		consts.ModelProviderGoogle:
+		consts.ModelProviderGoogle,
+		consts.ModelProviderNVIDIA,
+		consts.ModelProviderFireworks,
+		consts.ModelProviderCustom:
 		m, err := url.Parse(req.BaseURL)
 		if err != nil {
 			return nil, err
@@ -314,6 +318,10 @@ func (u *modelUsecase) isOverseasProvider(provider consts.ModelProvider) bool {
 		consts.ModelProviderOpenAI,
 		consts.ModelProviderAzureOpenAI,
 		consts.ModelProviderGoogle,
+		consts.ModelProviderNVIDIA,
+		consts.ModelProviderFireworks,
+		consts.ModelProviderCohere,
+		consts.ModelProviderCustom,
 	}
 	return slices.Contains(overseasProviders, provider)
 }

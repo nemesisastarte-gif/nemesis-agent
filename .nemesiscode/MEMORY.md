@@ -55,3 +55,15 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - Contrat agent v1 : processus sur stdout émet soit des octets bruts (→ chunk output), soit des lignes JSON {"event","kind","data","seq"} (→ chunks structurés) ; `task-ended` = fin de processus.
   - Limites v1 documentées dans docs/local-mode-design.md : terminal sans PTY (resize ignoré), buffer TaskLive en mémoire, AutoApprove/AskUserQuestion journalisés seulement, protocole réel ohmyagent à aligner (étape 4).
   - Vérifier le Go avec le parseur tree-sitter (npm: web-tree-sitter + tree-sitter-go.wasm) car le sandbox n'a pas de toolchain Go (go.dev/dl.google.com bloqués).
+
+[Frontend: providers API + sélection de modèles]
+- Date: 2026-08-12
+- Context: Le frontend web avait un champ provider figé (BaiZhiCloud) dans les dialogues de modèles
+- Category: 环境配置|排错调试
+- Instructions:
+  - La gestion des modèles vit dans `frontend/src/components/console/settings/` (user) et `frontend/src/components/manager/` (admin) : `add-model.tsx` / `edit-model.tsx` + `provider-model-combobox.tsx` (liste des modèles du provider via `getProviderModelList`).
+  - Les presets de providers (NVIDIA NIM, Fireworks, Cohere, OpenAI, DeepSeek, Custom OpenAI-format…) sont définis dans `PROVIDER_PRESETS` (add-model.tsx des deux dossiers) ; choisir un preset remplit base URL + interface type (`applyProviderPreset`).
+  - Backend : `biz/setting/usecase/model.go` GetProviderModelList — providers OpenAI-compatibles (dont NVIDIA/Fireworks/Custom) → GET {base}/models ; Cohere/AzureOpenAI/Volcengine → liste statique `domain.ModelProviderBrandModelsList` (consts/model.go pour les noms).
+  - Nouveaux providers à ajouter : consts/model.go + domain/model.go (liste statique si besoin) + switch GetProviderModelList + (si hors Chine) isOverseasProvider.
+  - Les fichiers de composants ne doivent JAMAIS contenir de caractères CJK (tests i18n `assert.doesNotMatch(cjkPattern)`) — commentaires en anglais.
+  - Terminal web : page task → panneaux files/terminal/changes/preview ; terminal VM aussi dans settings → VMs → bouton → /console/terminal?envid=. En mode local le terminal = shell sur la machine hôte (workspace de la tâche).

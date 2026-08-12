@@ -209,12 +209,15 @@ func (m *vmManager) IsOnline(ctx context.Context, req *taskflow.IsOnlineReq[stri
 }
 
 // Terminal ouvre un shell local dans le workspace de la VM.
+// Le ctx est conservé dans le Shell pour que BlockRead se débloque à la
+// déconnexion (sinon le handler ws resterait bloqué et le process jamais
+// stoppé — voir docs/local-mode-design.md).
 func (m *vmManager) Terminal(ctx context.Context, req *taskflow.TerminalReq) (taskflow.Sheller, error) {
 	rec := m.c.getVM(req.ID)
 	if rec == nil {
 		return nil, fmt.Errorf("environment not found: %s", req.ID)
 	}
-	shell, err := newShell(m.c.shell, rec.workspace, req.TerminalID)
+	shell, err := newShell(ctx, m.c.shell, rec.workspace, req.TerminalID)
 	if err != nil {
 		return nil, err
 	}

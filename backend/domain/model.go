@@ -343,4 +343,16 @@ var ModelProviderBrandModelsList = map[consts.ModelProvider][]ProviderModelListI
 		{Model: "doubao-1.5-thinking-vision-pro-250428"},
 		{Model: "deepseek-r1-250528"},
 	},
+	consts.ModelProviderCohere: {
+		{Model: "command-a"},
+		{Model: "command-r-plus"},
+		{Model: "command-r-plus-08-2024"},
+		{Model: "command-r"},
+		{Model: "command-r-08-2024"},
+		{Model: "command"},
+		{Model: "command-light"},
+		{Model: "c4ai-aya-expanse-32b"},
+		{Model: "embed-english-v3.0"},
+		{Model: "embed-multilingual-v3.0"},
+	},
 }

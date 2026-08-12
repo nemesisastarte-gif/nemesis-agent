@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 // Shell 是 Sheller 的本机实现：一个 shell 子进程，stdin/stdout 用管道桥接。
 // v1 没有 PTY : resize 被忽略（见 docs/local-mode-design.md，后续可用 x/sys 升级）。
 type Shell struct {
+	ctx        context.Context
 	terminalID string
 	cmd        *exec.Cmd
 	stdin      io.WriteCloser
@@ -24,7 +26,7 @@ type Shell struct {
 
 var _ taskflow.Sheller = (*Shell)(nil)
 
-func newShell(shellBin, dir, terminalID string) (*Shell, error) {
+func newShell(ctx context.Context, shellBin, dir, terminalID string) (*Shell, error) {
 	cmd := exec.Command(shellBin)
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
@@ -51,6 +53,7 @@ func newShell(shellBin, dir, terminalID string) (*Shell, error) {
 	_ = pw.Close() // le writer vit dans le child ; fermer ici évite les fuites
 
 	return &Shell{
+		ctx:        ctx,
 		terminalID: terminalID,
 		cmd:        cmd,
 		stdin:      stdin,
@@ -83,16 +86,19 @@ func (s *Shell) Stop() {
 			}()
 		}
 		_ = s.stdin.Close()
+		_ = s.stdout.Close() // 解除 BlockRead 中的阻塞读
 	})
 }
 
 // BlockRead 逐块读取 shell 输出并回调。先发一个 Connected 事件（与远端
-// taskflow 语义一致），然后持续发 Data 事件，直到 shell 退出。
+// taskflow 语义一致），然后持续发 Data 事件，直到 ctx 取消、Stop 或进程退出。
 func (s *Shell) BlockRead(fn func(taskflow.TerminalData)) error {
 	fn(taskflow.TerminalData{Connected: true})
 	buf := make([]byte, 32*1024)
 	for {
 		select {
+		case <-s.ctx.Done():
+			return nil
 		case <-s.done:
 			return nil
 		default:
@@ -104,7 +110,7 @@ func (s *Shell) BlockRead(fn func(taskflow.TerminalData)) error {
 			fn(taskflow.TerminalData{Data: data})
 		}
 		if err != nil {
-			return nil // EOF
+			return nil // EOF / closed
 		}
 	}
 }

@@ -40,6 +40,33 @@ const DEFAULT_PROVIDER = "BaiZhiCloud"
 const DEFAULT_CONTEXT_LIMIT = "200000"
 const DEFAULT_OUTPUT_LIMIT = "32000"
 
+// ProviderPreset: preset API providers (OpenAI-compatible endpoints).
+interface ProviderPreset {
+  provider: string
+  label: string
+  baseUrl: string
+  interfaceType: ConstsInterfaceType
+  needsToken: boolean
+}
+
+const PROVIDER_PRESETS: ProviderPreset[] = [
+  { provider: "OpenAI", label: "OpenAI", baseUrl: "https://api.openai.com/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "NVIDIA", label: "NVIDIA NIM", baseUrl: "https://integrate.api.nvidia.com/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "Fireworks", label: "Fireworks AI", baseUrl: "https://api.fireworks.ai/inference/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "Cohere", label: "Cohere", baseUrl: "https://api.cohere.com/compatibility/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "DeepSeek", label: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "Moonshot", label: "Moonshot (Kimi)", baseUrl: "https://api.moonshot.cn/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "SiliconFlow", label: "SiliconFlow", baseUrl: "https://api.siliconflow.cn/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "BaiZhiCloud", label: "BaiZhiCloud", baseUrl: "https://model-square.app.baizhi.cloud/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "Gemini", label: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "Hunyuan", label: "Tencent Hunyuan", baseUrl: "https://api.hunyuan.cloud.tencent.com/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "BaiLian", label: "Alibaba Bailian", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "Volcengine", label: "Volcengine", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "AzureOpenAI", label: "Azure OpenAI", baseUrl: "https://YOUR-RESOURCE.openai.azure.com/openai/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "Ollama", label: "Ollama (local)", baseUrl: "http://localhost:11434/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: false },
+  { provider: "Custom", label: "Custom (OpenAI format)", baseUrl: "https://your-endpoint.example.com/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+]
+
 export default function AddModel({
   open,
   onOpenChange,
@@ -68,6 +95,20 @@ export default function AddModel({
     setModelList([])
     setModelListAttempted(false)
     setModelListFetchFailed(false)
+  }
+
+  // applyProviderPreset fills base URL + interface type from the selected preset.
+  const applyProviderPreset = (providerName: string) => {
+    const preset = PROVIDER_PRESETS.find((p) => p.provider === providerName)
+    setProvider(providerName)
+    if (preset) {
+      setBaseUrl(preset.baseUrl)
+      setInterfaceType(preset.interfaceType)
+      if (!preset.needsToken && !apiToken.trim()) {
+        setApiToken("ollama") // local endpoints (Ollama): placeholder token
+      }
+    }
+    resetModelListState()
   }
 
   const resetForm = (source?: DomainModel | null) => {
@@ -267,6 +308,27 @@ export default function AddModel({
           <DialogTitle>{t("consoleSettings.models.add.title")}</DialogTitle>
         </DialogHeader>
         <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto overscroll-contain pr-1">
+          <Field>
+            <FieldLabel>{t("consoleSettings.models.labels.provider")}</FieldLabel>
+            <FieldContent>
+              <Select
+                value={provider}
+                onValueChange={applyProviderPreset}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={t("consoleSettings.models.placeholders.provider")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVIDER_PRESETS.map((preset) => (
+                    <SelectItem key={preset.provider} value={preset.provider}>
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FieldContent>
+            <FieldDescription>{t("consoleSettings.models.descriptionText.providerHint")}</FieldDescription>
+          </Field>
           <Field>
             <FieldLabel>{t("consoleSettings.models.labels.interfaceType")}</FieldLabel>
             <FieldContent>

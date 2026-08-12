@@ -1119,6 +1119,7 @@ const en = {
         confirm: "Remove",
       },
       labels: {
+        provider: "API provider",
         interfaceType: "Interface format",
         baseUrl: "Model API URL",
         modelName: "Model name",
@@ -1129,6 +1130,7 @@ const en = {
         imageRecognition: "Image recognition",
       },
       placeholders: {
+        provider: "Select an API provider",
         interfaceType: "Select interface format",
         baseUrl: "Enter model API URL",
         apiToken: "Enter API Token",
@@ -1151,6 +1153,7 @@ const en = {
       descriptionText: {
         apiUrlUnset: "Model API URL is not set",
         apiUrlInvalid: "Model URL is invalid",
+        providerHint: "Preset providers: NVIDIA NIM, Fireworks AI, Cohere, OpenAI, DeepSeek and more. Choose \"Custom (OpenAI format)\" for any OpenAI-compatible endpoint.",
         fetchFailedManual: "Unable to fetch model list. Enter the model ID from the provider documentation.",
         emptyManual: "No available models were returned. Enter the model name manually.",
         imageRecognition: "When enabled, this model can receive images for recognition and analysis.",
@@ -3357,6 +3360,9 @@ const en = {
     form: {
       addTitle: "Bind AI model",
       editTitle: "Edit AI model",
+      provider: "API provider",
+      providerPlaceholder: "Select an API provider",
+      providerHint: "Preset providers: NVIDIA NIM, Fireworks AI, Cohere, OpenAI, DeepSeek and more. Choose \"Custom (OpenAI format)\" for any OpenAI-compatible endpoint.",
       interfaceFormat: "Interface format",
       interfacePlaceholder: "Select an interface format",
       modelApiUrl: "Model API URL",
