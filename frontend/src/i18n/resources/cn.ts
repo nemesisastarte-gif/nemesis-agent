@@ -1179,6 +1179,7 @@ const cn = {
         addFailed: "绑定模型失败: {{message}}",
         updateSuccess: "模型修改成功",
         healthCheckFailed: "模型配置检查失败: {{message}}",
+        healthCheckSkipped: "本地模式下无法联网检查，模型已直接保存",
         incomplete: "模型信息不完整",
         removeSuccess: "模型移除成功",
         removeFailed: "移除模型失败: {{message}}",
@@ -3414,6 +3415,7 @@ const cn = {
       updateSuccess: "模型修改成功",
       updateFailedWithMessage: "修改模型失败: {{message}}",
       configCheckFailedWithMessage: "模型配置检查失败: {{message}}",
+      healthCheckSkipped: "本地模式下无法联网检查，模型已直接保存",
     },
   },
   managerImages: {

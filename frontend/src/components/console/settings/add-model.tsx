@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch"
 import { Spinner } from "@/components/ui/spinner"
 import { CircleQuestionMark } from 'lucide-react'
 import { modelProviderList } from "@/utils/common"
+import { IS_OFFLINE_EDITION } from "@/utils/edition"
 import { useTranslation } from "react-i18next"
 import { ProviderModelCombobox } from "./provider-model-combobox"
 
@@ -210,7 +211,41 @@ export default function AddModel({
 
     setSaving(true)
 
-    // Run a health check before saving.
+    // Sauvegarde effective (appelée après le health-check, ou directement en
+    // mode local quand le check réseau n'est pas possible).
+    const doSave = async () => {
+      const requestData: any = {
+        provider,
+        model: model.trim(),
+        remark: remark.trim(),
+        base_url: baseUrl.trim(),
+        api_key: apiToken.trim(),
+        interface_type: interfaceType,
+        context_limit: parsedContextLimit,
+        output_limit: parsedOutputLimit,
+        thinking_enabled: thinkingEnabled,
+        support_image: supportImage,
+      }
+
+      if (temperature !== undefined) {
+        requestData.temperature = temperature
+      }
+
+      await apiRequest('v1UsersModelsCreate', requestData, [], (resp) => {
+        if (resp.code === 0) {
+          toast.success(t("consoleSettings.models.toast.addSuccess"))
+          resetForm()
+          onOpenChange(false)
+          onRefresh?.()
+        } else {
+          toast.error(t("consoleSettings.models.toast.addFailed", { message: resp.message }))
+        }
+      })
+    }
+
+    // Health-check avant enregistrement. En mode local, un échec réseau ne
+    // bloque pas la sauvegarde (le provider peut être inaccessible depuis le
+    // serveur — firewall, preview…) : on enregistre quand même.
     const healthCheckData = {
       api_key: apiToken.trim(),
       model: model.trim(),
@@ -220,41 +255,24 @@ export default function AddModel({
     }
 
     await apiRequest('v1UsersModelsHealthCheckCreate', healthCheckData, [], async (resp) => {
-      if (resp.code === 0) {
-        if (resp.data?.success) {
-          const requestData: any = {
-            provider,
-            model: model.trim(),
-            remark: remark.trim(),
-            base_url: baseUrl.trim(),
-            api_key: apiToken.trim(),
-            interface_type: interfaceType,
-            context_limit: parsedContextLimit,
-            output_limit: parsedOutputLimit,
-            thinking_enabled: thinkingEnabled,
-            support_image: supportImage,
-          }
-
-          if (temperature !== undefined) {
-            requestData.temperature = temperature
-          }
-
-          await apiRequest('v1UsersModelsCreate', requestData, [], (resp) => {
-            if (resp.code === 0) {
-              toast.success(t("consoleSettings.models.toast.addSuccess"))
-              resetForm()
-              onOpenChange(false)
-              onRefresh?.()
-            } else {
-              toast.error(t("consoleSettings.models.toast.addFailed", { message: resp.message }))
-            }
-          })
+      if (resp.code === 0 && resp.data?.success) {
+        await doSave()
+      } else {
+        if (IS_OFFLINE_EDITION) {
+          toast.warning(t("consoleSettings.models.toast.healthCheckSkipped"))
+          await doSave()
         } else {
           toast.error(t("consoleSettings.models.toast.healthCheckFailed", { message: resp.data?.error }))
         }
       }
+    }, () => {
+      // La requête de health-check elle-même a échoué (réseau).
+      if (IS_OFFLINE_EDITION) {
+        toast.warning(t("consoleSettings.models.toast.healthCheckSkipped"))
+        void doSave()
+      }
     })
-    
+
     setSaving(false)
   }
 

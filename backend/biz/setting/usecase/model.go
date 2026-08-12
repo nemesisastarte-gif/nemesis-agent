@@ -256,7 +256,13 @@ func (u *modelUsecase) GetProviderModelList(ctx context.Context, req *domain.Get
 		query := u.getQuery(req)
 
 		if u.isOverseasProvider(req.Provider) {
-			return u.getModelsWithProxyRetry(ctx, req, m, query)
+			resp, err := u.getModelsWithProxyRetry(ctx, req, m, query)
+			if err == nil && resp != nil && len(resp.Models) > 0 {
+				return resp, nil
+			}
+			u.logger.WarnContext(ctx, "provider model list fetch failed, using static catalog",
+				"provider", req.Provider, "error", err)
+			return u.staticModels(req.Provider)
 		}
 
 		client := request.NewClient(m.Scheme, m.Host, u.client.Timeout, request.WithClient(u.client))
@@ -269,11 +275,10 @@ func (u *modelUsecase) GetProviderModelList(ctx context.Context, req *domain.Get
 			),
 			request.WithQuery(query),
 		)
-		if err != nil {
-			return nil, err
-		}
-		if resp.Error != nil {
-			return nil, fmt.Errorf("get provider model list error: %s (type: %s)", resp.Error.Message, resp.Error.Type)
+		if err != nil || resp.Error != nil {
+			u.logger.WarnContext(ctx, "provider model list fetch failed, using static catalog",
+				"provider", req.Provider, "error", err)
+			return u.staticModels(req.Provider)
 		}
 
 		return &domain.GetProviderModelListResp{
@@ -300,17 +305,27 @@ func (u *modelUsecase) GetProviderModelList(ctx context.Context, req *domain.Get
 		}
 
 		resp, err := request.Get[domain.GetProviderModelListResp](client, ctx, m.Path, request.WithHeader(h))
-		if err != nil {
-			return nil, err
-		}
-		if resp.Error != nil {
-			return nil, fmt.Errorf("get provider model list error: %s (type: %s)", resp.Error.Message, resp.Error.Type)
+		if err != nil || resp.Error != nil {
+			u.logger.WarnContext(ctx, "ollama model list fetch failed, using static catalog",
+				"provider", req.Provider, "error", err)
+			return u.staticModels(req.Provider)
 		}
 		return resp, nil
 
 	default:
 		return nil, fmt.Errorf("invalid provider: %s", req.Provider)
 	}
+}
+
+// staticModels retourne le catalogue statique du provider (jamais d'appel
+// réseau) — utilisé en fallback quand le réseau est indisponible (mode local,
+// réseaux filtrés) pour que la liste des modèles s'affiche toujours.
+func (u *modelUsecase) staticModels(provider consts.ModelProvider) (*domain.GetProviderModelListResp, error) {
+	models := domain.ModelProviderBrandModelsList[provider]
+	if len(models) == 0 {
+		return &domain.GetProviderModelListResp{Models: []domain.ProviderModelListItem{}}, nil
+	}
+	return &domain.GetProviderModelListResp{Models: models}, nil
 }
 
 func (u *modelUsecase) isOverseasProvider(provider consts.ModelProvider) bool {

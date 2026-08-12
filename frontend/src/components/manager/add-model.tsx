@@ -16,6 +16,7 @@ import { toast } from "sonner"
 import type { DomainProviderModelListItem, DomainTeamGroup, DomainTeamModel } from "@/api/Api"
 import { ConstsInterfaceType } from "@/api/Api"
 import { getModelDisplayName, getModelUrlDescription, modelProviderList } from "@/utils/common"
+import { IS_OFFLINE_EDITION } from "@/utils/edition"
 import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -229,6 +230,39 @@ export default function AddModel({
 
     setSaving(true)
 
+    // Sauvegarde effective (après le health-check, ou directement en mode
+    // local quand le réseau n'est pas joignable).
+    const doSave = async () => {
+      const requestData: any = {
+        provider,
+        model: model.trim(),
+        base_url: baseUrl.trim(),
+        api_key: apiToken.trim(),
+        interface_type: interfaceType,
+        support_image: supportImage,
+        group_ids: selectedGroupIds
+      }
+
+      if (remark.trim()) {
+        requestData.remark = remark.trim()
+      }
+
+      if (temperature !== undefined) {
+        requestData.temperature = temperature
+      }
+
+      await apiRequest('v1TeamsModelsCreate', requestData, [], (resp) => {
+        if (resp.code === 0) {
+          toast.success(t("managerModels.toast.bindSuccess"))
+          resetForm()
+          onOpenChange(false)
+          onRefresh?.()
+        } else {
+          toast.error(t("managerModels.toast.bindFailedWithMessage", { message: resp.message }));
+        }
+      })
+    }
+
     const healthCheckData = {
       api_key: apiToken.trim(),
       model: model.trim(),
@@ -238,39 +272,20 @@ export default function AddModel({
     }
 
     await apiRequest('v1TeamsModelsHealthCheckCreate', healthCheckData, [], async (resp) => {
-      if (resp.code === 0) {
-        if (resp.data?.success) {
-          const requestData: any = {
-            provider,
-            model: model.trim(),
-            base_url: baseUrl.trim(),
-            api_key: apiToken.trim(),
-            interface_type: interfaceType,
-            support_image: supportImage,
-            group_ids: selectedGroupIds
-          }
-
-          if (remark.trim()) {
-            requestData.remark = remark.trim()
-          }
-
-          if (temperature !== undefined) {
-            requestData.temperature = temperature
-          }
-
-          await apiRequest('v1TeamsModelsCreate', requestData, [], (resp) => {
-            if (resp.code === 0) {
-              toast.success(t("managerModels.toast.bindSuccess"))
-              resetForm()
-              onOpenChange(false)
-              onRefresh?.()
-            } else {
-              toast.error(t("managerModels.toast.bindFailedWithMessage", { message: resp.message }));
-            }
-          })
+      if (resp.code === 0 && resp.data?.success) {
+        await doSave()
+      } else {
+        if (IS_OFFLINE_EDITION) {
+          toast.warning(t("managerModels.toast.healthCheckSkipped"))
+          await doSave()
         } else {
           toast.error(t("managerModels.toast.configCheckFailedWithMessage", { message: resp.data?.error }))
         }
+      }
+    }, () => {
+      if (IS_OFFLINE_EDITION) {
+        toast.warning(t("managerModels.toast.healthCheckSkipped"))
+        void doSave()
       }
     })
     

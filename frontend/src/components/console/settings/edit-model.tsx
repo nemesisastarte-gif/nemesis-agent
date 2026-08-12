@@ -23,6 +23,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Spinner } from "@/components/ui/spinner"
 import { modelProviderList } from "@/utils/common"
+import { IS_OFFLINE_EDITION } from "@/utils/edition"
 import { useTranslation } from "react-i18next"
 import { ProviderModelCombobox } from "./provider-model-combobox"
 
@@ -175,55 +176,69 @@ export default function EditModel({
       provider: provider,
     }
 
+    // Sauvegarde effective (appelée après le health-check, ou directement en
+    // mode local quand le réseau n'est pas joignable).
+    const doSaveEdit = async () => {
+      const requestData: any = {
+        api_key: apiToken.trim(),
+        model: selectedModel.trim(),
+        remark: remark.trim(),
+        base_url: baseUrl.trim(),
+        interface_type: interfaceType,
+        thinking_enabled: thinkingEnabled,
+        support_image: supportImage,
+      }
+
+      if (parsedContextLimit !== undefined) {
+        requestData.context_limit = parsedContextLimit
+      }
+
+      if (parsedOutputLimit !== undefined) {
+        requestData.output_limit = parsedOutputLimit
+      }
+
+      // Preserve the provider when the existing model has one.
+      if (model.provider) {
+        requestData.provider = model.provider
+      }
+
+      await apiRequest('v1UsersModelsUpdate', requestData, [model.id!], (resp) => {
+        if (resp.code === 0) {
+          toast.success(t("consoleSettings.models.toast.updateSuccess"))
+          setApiToken("")
+          setBaseUrl("")
+          setSelectedModel("")
+          setRemark("")
+          setInterfaceType(ConstsInterfaceType.InterfaceTypeOpenAIChat)
+          setContextLimit("")
+          setOutputLimit("")
+          setThinkingEnabled(false)
+          setSupportImage(false)
+          resetModelListState()
+          onOpenChange(false)
+          onRefresh?.()
+        }
+      })
+    }
+
     await apiRequest('v1UsersModelsHealthCheckCreate', healthCheckData, [], async (resp) => {
-      if (resp.code === 0) {
-        if (resp.data?.success) {
-          const requestData: any = {
-            api_key: apiToken.trim(),
-            model: selectedModel.trim(),
-            remark: remark.trim(),
-            base_url: baseUrl.trim(),
-            interface_type: interfaceType,
-            thinking_enabled: thinkingEnabled,
-            support_image: supportImage,
-          }
-
-          if (parsedContextLimit !== undefined) {
-            requestData.context_limit = parsedContextLimit
-          }
-
-          if (parsedOutputLimit !== undefined) {
-            requestData.output_limit = parsedOutputLimit
-          }
-
-          // Preserve the provider when the existing model has one.
-          if (model.provider) {
-            requestData.provider = model.provider
-          }
-
-          await apiRequest('v1UsersModelsUpdate', requestData, [model.id!], (resp) => {
-            if (resp.code === 0) {
-              toast.success(t("consoleSettings.models.toast.updateSuccess"))
-              setApiToken("")
-              setBaseUrl("")
-              setSelectedModel("")
-              setRemark("")
-              setInterfaceType(ConstsInterfaceType.InterfaceTypeOpenAIChat)
-              setContextLimit("")
-              setOutputLimit("")
-              setThinkingEnabled(false)
-              setSupportImage(false)
-              resetModelListState()
-              onOpenChange(false)
-              onRefresh?.()
-            }
-          })
+      if (resp.code === 0 && resp.data?.success) {
+        await doSaveEdit()
+      } else {
+        if (IS_OFFLINE_EDITION) {
+          toast.warning(t("consoleSettings.models.toast.healthCheckSkipped"))
+          await doSaveEdit()
         } else {
           toast.error(t("consoleSettings.models.toast.healthCheckFailed", { message: resp.data?.error }))
         }
       }
+    }, () => {
+      if (IS_OFFLINE_EDITION) {
+        toast.warning(t("consoleSettings.models.toast.healthCheckSkipped"))
+        void doSaveEdit()
+      }
     })
-    
+
     setSaving(false)
   }
 

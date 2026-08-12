@@ -1179,6 +1179,7 @@ const en = {
         addFailed: "Failed to bind model: {{message}}",
         updateSuccess: "Model updated",
         healthCheckFailed: "Model configuration check failed: {{message}}",
+        healthCheckSkipped: "Network check unavailable (local mode) — model saved anyway",
         incomplete: "Model information is incomplete",
         removeSuccess: "Model removed",
         removeFailed: "Failed to remove model: {{message}}",
@@ -3414,6 +3415,7 @@ const en = {
       updateSuccess: "Model updated",
       updateFailedWithMessage: "Failed to update model: {{message}}",
       configCheckFailedWithMessage: "Model configuration check failed: {{message}}",
+      healthCheckSkipped: "Network check unavailable (local mode) — model saved anyway",
     },
   },
   managerImages: {
