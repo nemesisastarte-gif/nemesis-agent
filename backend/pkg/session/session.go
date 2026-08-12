@@ -41,6 +41,25 @@ func lookupKey(name, cookie string) string {
 	return fmt.Sprintf("lookup:%s:%s", name, cookie)
 }
 
+// cookieAttrs détermine les attributs du cookie de session.
+//
+// En mode local (MCAI_TASKFLOW_MODE=local), on force SameSite=None + Secure :
+// l'interface web est souvent servie dans un contexte HTTPS (iframe d'un
+// preview, reverse proxy) où un cookie SameSite=Lax est bloqué par le
+// navigateur — ce qui provoquait une boucle login → 401 → login. Sur
+// http://localhost, les navigateurs traitent localhost comme un contexte
+// sécurisé et acceptent les cookies Secure.
+func (s *Session) cookieAttrs(c echo.Context) (sameSite http.SameSite, secure bool) {
+	if s.cfg.TaskFlow.Mode == "local" {
+		return http.SameSiteNoneMode, true
+	}
+	proto := c.Request().Header.Get("X-Forwarded-Proto")
+	if c.Request().TLS != nil || proto == "https" {
+		return http.SameSiteNoneMode, true
+	}
+	return http.SameSiteLaxMode, false
+}
+
 // Save 创建 session，内部生成 UUID cookie 并设置到 response
 func (s *Session) Save(c echo.Context, name string, uid uuid.UUID, data any) (string, error) {
 	ctx := c.Request().Context()
@@ -61,13 +80,15 @@ func (s *Session) Save(c echo.Context, name string, uid uuid.UUID, data any) (st
 		return "", fmt.Errorf("save session: %w", err)
 	}
 
+	sameSite, secure := s.cookieAttrs(c)
 	c.SetCookie(&http.Cookie{
 		Name:     name,
 		Value:    cookie,
 		Path:     "/",
 		MaxAge:   int(expire.Seconds()),
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
+		Secure:   secure,
 	})
 	return cookie, nil
 }
@@ -117,12 +138,15 @@ func (s *Session) Del(c echo.Context, name string, uid uuid.UUID) error {
 		return err
 	}
 
+	sameSite, secure := s.cookieAttrs(c)
 	c.SetCookie(&http.Cookie{
 		Name:     name,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		SameSite: sameSite,
+		Secure:   secure,
 	})
 	return nil
 }
