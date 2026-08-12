@@ -69,6 +69,11 @@ type AuthMiddleware struct {
 	Session *session.Session
 	usecase domain.UserUsecase
 	logger  *slog.Logger
+	// localBootstrap : mode local (MCAI_TASKFLOW_MODE=local) — si aucune
+	// session valide, on résout automatiquement le compte admin local
+	// (init-team). L'interface web est alors utilisable sans page de
+	// connexion ni cookie (pratique derrière un preview/iframe).
+	localBootstrap func(ctx context.Context) (*domain.User, error)
 }
 
 // NewAuthMiddleware 创建认证中间件管理器
@@ -76,12 +81,37 @@ func NewAuthMiddleware(
 	sess *session.Session,
 	usecase domain.UserUsecase,
 	logger *slog.Logger,
+	opts ...func(*AuthMiddleware),
 ) *AuthMiddleware {
-	return &AuthMiddleware{
+	a := &AuthMiddleware{
 		Session: sess,
 		usecase: usecase,
 		logger:  logger.With("module", "AuthMiddleware"),
 	}
+	for _, opt := range opts {
+		opt(a)
+	}
+	return a
+}
+
+// WithLocalBootstrap 注入 mode local 的自动认证（résolution du compte admin).
+func WithLocalBootstrap(fn func(ctx context.Context) (*domain.User, error)) func(*AuthMiddleware) {
+	return func(a *AuthMiddleware) {
+		a.localBootstrap = fn
+	}
+}
+
+// applyLocalBootstrap tente la résolution auto du compte admin local.
+func (a *AuthMiddleware) applyLocalBootstrap(ctx context.Context) *domain.User {
+	if a.localBootstrap == nil {
+		return nil
+	}
+	u, err := a.localBootstrap(ctx)
+	if err != nil || u == nil {
+		a.logger.DebugContext(ctx, "local bootstrap failed", "error", err)
+		return nil
+	}
+	return u
 }
 
 // Auth 强制要求认证
@@ -92,11 +122,20 @@ func (a *AuthMiddleware) Auth() echo.MiddlewareFunc {
 
 			user, err := session.Get[*domain.User](a.Session, c, consts.NemesisCodeAISession)
 			if err != nil {
+				// Mode local : auto-auth sans cookie (compte admin local).
+				if u := a.applyLocalBootstrap(ctx); u != nil {
+					SetUser(c, u)
+					return next(c)
+				}
 				a.logger.DebugContext(ctx, "get user session failed", "error", err)
 				return c.String(http.StatusUnauthorized, "Unauthorized")
 			}
 
 			if user == nil {
+				if u := a.applyLocalBootstrap(ctx); u != nil {
+					SetUser(c, u)
+					return next(c)
+				}
 				a.logger.DebugContext(ctx, "no user found, skipping auth")
 				return c.String(http.StatusUnauthorized, "Unauthorized")
 			}
@@ -115,12 +154,17 @@ func (a *AuthMiddleware) Check() echo.MiddlewareFunc {
 
 			user, err := session.Get[*domain.User](a.Session, c, consts.NemesisCodeAISession)
 			if err != nil {
-				a.logger.DebugContext(ctx, "get user session failed", "error", err)
+				// Mode local : auto-auth sans cookie (compte admin local).
+				if u := a.applyLocalBootstrap(ctx); u != nil {
+					SetUser(c, u)
+				}
 				return next(c)
 			}
 
 			if user == nil {
-				a.logger.DebugContext(ctx, "no user found, skipping auth")
+				if u := a.applyLocalBootstrap(ctx); u != nil {
+					SetUser(c, u)
+				}
 				return next(c)
 			}
 

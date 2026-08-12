@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/GoYoko/web"
@@ -11,10 +12,12 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/config"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db"
+	"github.com/teteekoue/NemesisCode/backend/db/user"
 	"github.com/teteekoue/NemesisCode/backend/domain"
 	"github.com/teteekoue/NemesisCode/backend/middleware"
 	"github.com/teteekoue/NemesisCode/backend/pkg/asr"
 	"github.com/teteekoue/NemesisCode/backend/pkg/captcha"
+	"github.com/teteekoue/NemesisCode/backend/pkg/cvt"
 	"github.com/teteekoue/NemesisCode/backend/pkg/clickhouse"
 	"github.com/teteekoue/NemesisCode/backend/pkg/delayqueue"
 	"github.com/teteekoue/NemesisCode/backend/pkg/doubao"
@@ -91,7 +94,30 @@ func RegisterInfra(i *do.Injector, w ...*web.Web) error {
 	do.Provide(i, func(i *do.Injector) (*middleware.AuthMiddleware, error) {
 		sess := do.MustInvoke[*session.Session](i)
 		l := do.MustInvoke[*slog.Logger](i)
-		return middleware.NewAuthMiddleware(sess, nil, l), nil
+		cfg := do.MustInvoke[*config.Config](i)
+
+		var opts []func(*middleware.AuthMiddleware)
+		if cfg.TaskFlow.Mode == "local" {
+			// Mode local : auto-auth — résout le compte admin (init-team)
+			// quand aucune session cookie n'est présente. L'interface web
+			// est utilisable sans page de connexion.
+			dbc := do.MustInvoke[*db.Client](i)
+			opts = append(opts, middleware.WithLocalBootstrap(func(ctx context.Context) (*domain.User, error) {
+				q := dbc.User.Query()
+				if email := cfg.InitTeam.Email; email != "" {
+					q = q.Where(user.EmailEQ(email), user.RoleNEQ(consts.UserRoleEnterprise))
+				} else {
+					q = q.Where(user.RoleNEQ(consts.UserRoleEnterprise))
+				}
+				u, err := q.Order(user.ByCreatedAt()).First(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return cvt.From(u, &domain.User{}), nil
+			}))
+		}
+
+		return middleware.NewAuthMiddleware(sess, nil, l, opts...), nil
 	})
 
 	// TargetActive Middleware

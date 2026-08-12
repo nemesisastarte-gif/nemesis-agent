@@ -2,6 +2,7 @@ import { Api } from '@/api/Api';
 import type { HttpResponse, RequestParams, GithubComGoYokoWebResp } from '@/api/Api';
 import { toast } from 'sonner';
 import i18n from '@/i18n';
+import { IS_OFFLINE_EDITION } from '@/utils/edition';
 
 function requestText(key: string, options?: Record<string, unknown>): string {
   return String(i18n.t(`requestUtils.${key}`, options));
@@ -47,7 +48,7 @@ export const apiRequest = async (
     return;
   } catch (e) {
     if (e instanceof Response && e.status === 401){
-      if (window.location.pathname.includes('/console') || window.location.pathname.includes('/manager')) {
+      if (!IS_OFFLINE_EDITION && (window.location.pathname.includes('/console') || window.location.pathname.includes('/manager'))) {
         window.location.href = '/login';
       }
       return;

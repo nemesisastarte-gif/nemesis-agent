@@ -21,7 +21,7 @@ import { Spinner } from "@/components/ui/spinner"
 import React from "react"
 import { toast } from "sonner"
 import { apiRequest } from "@/utils/requestUtils"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, Navigate, useNavigate } from "react-router-dom"
 import { captchaChallenge } from "@/utils/common"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { IconBrandGithub, IconBrandGoogle } from "@tabler/icons-react"
@@ -222,7 +222,13 @@ export default function LoginPage({
     setLogging(false)
   }
 
+  // Mode local : pas de page de connexion — accès direct à la console
+  // (le backend auto-authentifie le compte admin local).
   if (IS_OFFLINE_EDITION) {
+    return <Navigate to="/console/tasks" replace />
+  }
+
+  if (false) {
     return (
       <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
         <div className="w-full max-w-sm">
