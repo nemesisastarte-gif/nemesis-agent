@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/host"
 	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/teteekoue/NemesisCode/backend/db/teamhost"
-	"github.com/google/uuid"
 )
 
 // TeamHostCreate is the builder for creating a TeamHost entity.
@@ -55,6 +55,14 @@ func (_c *TeamHostCreate) SetNillableCreatedAt(v *time.Time) *TeamHostCreate {
 // SetID sets the "id" field.
 func (_c *TeamHostCreate) SetID(v uuid.UUID) *TeamHostCreate {
 	_c.mutation.SetID(v)
+	return _c
+}
+
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *TeamHostCreate) SetNillableID(v *uuid.UUID) *TeamHostCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
 	return _c
 }
 
@@ -106,6 +114,10 @@ func (_c *TeamHostCreate) defaults() {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := teamhost.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := teamhost.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/image"
 	"github.com/teteekoue/NemesisCode/backend/db/mcpupstream"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
@@ -24,7 +25,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/teammember"
 	"github.com/teteekoue/NemesisCode/backend/db/teammodel"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // TeamQuery is the builder for querying Team entities.

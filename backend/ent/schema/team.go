@@ -33,7 +33,7 @@ func (Team) Mixin() []ent.Mixin {
 // Fields of the Team.
 func (Team) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.String("name").NotEmpty(),
 		field.Int("member_limit"),
 		field.Int("task_concurrency_limit").Default(3).Positive(),

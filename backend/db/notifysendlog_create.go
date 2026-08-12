@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/notifysendlog"
-	"github.com/google/uuid"
 )
 
 // NotifySendLogCreate is the builder for creating a NotifySendLog entity.
@@ -89,6 +89,14 @@ func (_c *NotifySendLogCreate) SetID(v uuid.UUID) *NotifySendLogCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *NotifySendLogCreate) SetNillableID(v *uuid.UUID) *NotifySendLogCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // Mutation returns the NotifySendLogMutation object of the builder.
 func (_c *NotifySendLogCreate) Mutation() *NotifySendLogMutation {
 	return _c.mutation
@@ -131,6 +139,10 @@ func (_c *NotifySendLogCreate) defaults() {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := notifysendlog.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := notifysendlog.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

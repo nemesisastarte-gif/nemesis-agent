@@ -9,9 +9,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/agentrule"
 	"github.com/teteekoue/NemesisCode/backend/db/agentruleversion"
-	"github.com/google/uuid"
 )
 
 // AgentRuleVersion is the model entity for the AgentRuleVersion schema.

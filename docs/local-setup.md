@@ -41,7 +41,7 @@ Le script :
    - `MCAI_DATABASE_DRIVER=sqlite` — base fichier `~/.nemesiscode/nemesiscode.db`
      (aucun PostgreSQL requis) ;
    - `MCAI_REDIS_HOST` vide — **Redis en mémoire intégré** (miniredis) ;
-   - compte initial `admin@nemesis.local` / `nemesis123`
+   - compte initial `Admin` / `Admin`
      (surchargeable via `MCAI_INIT_TEAM_EMAIL` / `MCAI_INIT_TEAM_PASSWORD`) ;
    - image d'environnement `local-env` créée pour le compte initial
      (`MCAI_INIT_TEAM_IMAGE`) ;
@@ -65,8 +65,8 @@ scripts/nemesis-local.sh start
 export MCAI_TASKFLOW_MODE=local
 export MCAI_DATABASE_DRIVER=sqlite
 export MCAI_REDIS_HOST=                # vide → Redis en mémoire
-export MCAI_INIT_TEAM_EMAIL=admin@nemesis.local
-export MCAI_INIT_TEAM_PASSWORD=nemesis123
+export MCAI_INIT_TEAM_EMAIL=Admin
+export MCAI_INIT_TEAM_PASSWORD=Admin
 export MCAI_INIT_TEAM_IMAGE=local-env
 export MCAI_SECURITY_CAPTCHA_ENABLED=false
 export MCAI_SERVER_ADDR=:8888
@@ -106,7 +106,7 @@ TARGET=http://127.0.0.1:8888 pnpm run dev:offline -- --host 0.0.0.0 --port 5173
 | `MCAI_TASKFLOW_LOCAL_WORKSPACE_ROOT` | `~/.nemesiscode/workspaces` | racine des espaces de travail |
 | `MCAI_TASKFLOW_LOCAL_AGENT_BIN` | `ohmyagent` | binaire du moteur agent |
 | `MCAI_TASKFLOW_LOCAL_SHELL` | `$SHELL` | shell des terminaux web |
-| `MCAI_INIT_TEAM_EMAIL` / `PASSWORD` | `admin@nemesis.local` / `nemesis123` | compte initial (admin, propriétaire de l'hôte local) |
+| `MCAI_INIT_TEAM_EMAIL` / `PASSWORD` | `Admin` / `Admin` | compte initial (admin, propriétaire de l'hôte local) |
 | `MCAI_INIT_TEAM_IMAGE` | `local-env` | image d'environnement par défaut |
 | `MCAI_SECURITY_CAPTCHA_ENABLED` | `true` | `false` recommandé en local |
 | `MCAI_OBJECT_STORAGE_PROVIDER` | `s3` | `local` = stockage fichier sur disque (aucun S3/rustfs) |

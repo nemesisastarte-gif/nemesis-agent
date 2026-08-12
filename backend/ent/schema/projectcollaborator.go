@@ -34,7 +34,7 @@ func (ProjectCollaborator) Mixin() []ent.Mixin {
 // Fields of the ProjectCollaborator.
 func (ProjectCollaborator) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("project_id", uuid.UUID{}),
 		field.UUID("user_id", uuid.UUID{}),
 		field.String("role").GoType(consts.ProjectCollaboratorRole("")).Default(string(consts.ProjectCollaboratorRoleReadOnly)),

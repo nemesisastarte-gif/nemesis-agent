@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/teteekoue/NemesisCode/backend/db/teamoidcconfig"
-	"github.com/google/uuid"
 )
 
 // TeamOIDCConfigCreate is the builder for creating a TeamOIDCConfig entity.
@@ -175,6 +175,14 @@ func (_c *TeamOIDCConfigCreate) SetID(v uuid.UUID) *TeamOIDCConfigCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *TeamOIDCConfigCreate) SetNillableID(v *uuid.UUID) *TeamOIDCConfigCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetTeam sets the "team" edge to the Team entity.
 func (_c *TeamOIDCConfigCreate) SetTeam(v *Team) *TeamOIDCConfigCreate {
 	return _c.SetTeamID(v.ID)
@@ -242,6 +250,10 @@ func (_c *TeamOIDCConfigCreate) defaults() {
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		v := teamoidcconfig.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := teamoidcconfig.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

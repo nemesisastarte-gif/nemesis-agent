@@ -9,9 +9,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/gittask"
 	"github.com/teteekoue/NemesisCode/backend/db/task"
-	"github.com/google/uuid"
 )
 
 // GitTask is the model entity for the GitTask schema.

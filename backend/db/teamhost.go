@@ -9,10 +9,10 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/host"
 	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/teteekoue/NemesisCode/backend/db/teamhost"
-	"github.com/google/uuid"
 )
 
 // TeamHost is the model entity for the TeamHost schema.

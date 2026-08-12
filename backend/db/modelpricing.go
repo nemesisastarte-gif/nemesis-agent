@@ -9,9 +9,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
 	"github.com/teteekoue/NemesisCode/backend/db/modelpricing"
-	"github.com/google/uuid"
 )
 
 // ModelPricing is the model entity for the ModelPricing schema.

@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/image"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroup"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroupimage"
-	"github.com/google/uuid"
 )
 
 // TeamGroupImageCreate is the builder for creating a TeamGroupImage entity.
@@ -55,6 +55,14 @@ func (_c *TeamGroupImageCreate) SetNillableCreatedAt(v *time.Time) *TeamGroupIma
 // SetID sets the "id" field.
 func (_c *TeamGroupImageCreate) SetID(v uuid.UUID) *TeamGroupImageCreate {
 	_c.mutation.SetID(v)
+	return _c
+}
+
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *TeamGroupImageCreate) SetNillableID(v *uuid.UUID) *TeamGroupImageCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
 	return _c
 }
 
@@ -106,6 +114,10 @@ func (_c *TeamGroupImageCreate) defaults() {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := teamgroupimage.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := teamgroupimage.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

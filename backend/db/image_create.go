@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/image"
 	"github.com/teteekoue/NemesisCode/backend/db/project"
 	"github.com/teteekoue/NemesisCode/backend/db/projecttask"
@@ -21,7 +22,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroupimage"
 	"github.com/teteekoue/NemesisCode/backend/db/teamimage"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // ImageCreate is the builder for creating a Image entity.
@@ -145,6 +145,14 @@ func (_c *ImageCreate) SetNillableUpdatedAt(v *time.Time) *ImageCreate {
 // SetID sets the "id" field.
 func (_c *ImageCreate) SetID(v uuid.UUID) *ImageCreate {
 	_c.mutation.SetID(v)
+	return _c
+}
+
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *ImageCreate) SetNillableID(v *uuid.UUID) *ImageCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
 	return _c
 }
 
@@ -309,6 +317,13 @@ func (_c *ImageCreate) defaults() error {
 		v := image.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if image.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized image.DefaultID (forgotten import db/runtime?)")
+		}
+		v := image.DefaultID()
+		_c.mutation.SetID(v)
+	}
 	return nil
 }
 
@@ -437,6 +452,9 @@ func (_c *ImageCreate) createSpec() (*Image, *sqlgraph.CreateSpec) {
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.GroupsIDs(); len(nodes) > 0 {
@@ -457,6 +475,9 @@ func (_c *ImageCreate) createSpec() (*Image, *sqlgraph.CreateSpec) {
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ProjectTasksIDs(); len(nodes) > 0 {

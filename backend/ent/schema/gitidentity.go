@@ -34,7 +34,7 @@ func (GitIdentity) Mixin() []ent.Mixin {
 // Fields of the GitIdentity.
 func (GitIdentity) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("user_id", uuid.UUID{}),
 		field.String("platform").GoType(consts.GitPlatform("")),
 		field.String("base_url").Optional(),

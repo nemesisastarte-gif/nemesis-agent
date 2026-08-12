@@ -10,9 +10,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // User is the model entity for the User schema.

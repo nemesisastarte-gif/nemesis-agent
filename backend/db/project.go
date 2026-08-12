@@ -10,12 +10,12 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/gitidentity"
 	"github.com/teteekoue/NemesisCode/backend/db/image"
 	"github.com/teteekoue/NemesisCode/backend/db/project"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // Project is the model entity for the Project schema.

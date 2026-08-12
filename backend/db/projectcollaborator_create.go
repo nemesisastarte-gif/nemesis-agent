@@ -12,11 +12,11 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/project"
 	"github.com/teteekoue/NemesisCode/backend/db/projectcollaborator"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // ProjectCollaboratorCreate is the builder for creating a ProjectCollaborator entity.
@@ -101,6 +101,14 @@ func (_c *ProjectCollaboratorCreate) SetID(v uuid.UUID) *ProjectCollaboratorCrea
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *ProjectCollaboratorCreate) SetNillableID(v *uuid.UUID) *ProjectCollaboratorCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_c *ProjectCollaboratorCreate) SetUser(v *User) *ProjectCollaboratorCreate {
 	return _c.SetUserID(v.ID)
@@ -165,6 +173,13 @@ func (_c *ProjectCollaboratorCreate) defaults() error {
 		}
 		v := projectcollaborator.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if projectcollaborator.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized projectcollaborator.DefaultID (forgotten import db/runtime?)")
+		}
+		v := projectcollaborator.DefaultID()
+		_c.mutation.SetID(v)
 	}
 	return nil
 }

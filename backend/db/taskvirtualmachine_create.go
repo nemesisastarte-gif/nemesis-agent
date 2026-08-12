@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/task"
 	"github.com/teteekoue/NemesisCode/backend/db/taskvirtualmachine"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachine"
-	"github.com/google/uuid"
 )
 
 // TaskVirtualMachineCreate is the builder for creating a TaskVirtualMachine entity.
@@ -55,6 +55,14 @@ func (_c *TaskVirtualMachineCreate) SetNillableCreatedAt(v *time.Time) *TaskVirt
 // SetID sets the "id" field.
 func (_c *TaskVirtualMachineCreate) SetID(v uuid.UUID) *TaskVirtualMachineCreate {
 	_c.mutation.SetID(v)
+	return _c
+}
+
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *TaskVirtualMachineCreate) SetNillableID(v *uuid.UUID) *TaskVirtualMachineCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
 	return _c
 }
 
@@ -106,6 +114,10 @@ func (_c *TaskVirtualMachineCreate) defaults() {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := taskvirtualmachine.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := taskvirtualmachine.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

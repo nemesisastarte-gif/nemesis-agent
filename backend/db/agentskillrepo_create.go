@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/agentskill"
 	"github.com/teteekoue/NemesisCode/backend/db/agentskillrepo"
-	"github.com/google/uuid"
 )
 
 // AgentSkillRepoCreate is the builder for creating a AgentSkillRepo entity.

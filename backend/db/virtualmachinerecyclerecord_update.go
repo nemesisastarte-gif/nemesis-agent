@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachinerecyclerecord"
-	"github.com/google/uuid"
 )
 
 // VirtualMachineRecycleRecordUpdate is the builder for updating VirtualMachineRecycleRecord entities.

@@ -11,12 +11,12 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
 	"github.com/teteekoue/NemesisCode/backend/db/project"
 	"github.com/teteekoue/NemesisCode/backend/db/projectcollaborator"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // ProjectCollaboratorUpdate is the builder for updating ProjectCollaborator entities.

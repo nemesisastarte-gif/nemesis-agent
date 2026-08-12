@@ -10,10 +10,10 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/agentskill"
 	"github.com/teteekoue/NemesisCode/backend/db/agentskillversion"
 	"github.com/teteekoue/NemesisCode/backend/ent/types"
-	"github.com/google/uuid"
 )
 
 // AgentSkillVersion is the model entity for the AgentSkillVersion schema.

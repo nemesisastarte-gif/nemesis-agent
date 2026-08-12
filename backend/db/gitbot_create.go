@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/gitbot"
 	"github.com/teteekoue/NemesisCode/backend/db/gitbottask"
@@ -20,7 +21,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/project"
 	"github.com/teteekoue/NemesisCode/backend/db/projectgitbot"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // GitBotCreate is the builder for creating a GitBot entity.
@@ -122,6 +122,14 @@ func (_c *GitBotCreate) SetNillableCreatedAt(v *time.Time) *GitBotCreate {
 // SetID sets the "id" field.
 func (_c *GitBotCreate) SetID(v uuid.UUID) *GitBotCreate {
 	_c.mutation.SetID(v)
+	return _c
+}
+
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *GitBotCreate) SetNillableID(v *uuid.UUID) *GitBotCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
 	return _c
 }
 
@@ -248,6 +256,13 @@ func (_c *GitBotCreate) defaults() error {
 		}
 		v := gitbot.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if gitbot.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized gitbot.DefaultID (forgotten import db/runtime?)")
+		}
+		v := gitbot.DefaultID()
+		_c.mutation.SetID(v)
 	}
 	return nil
 }

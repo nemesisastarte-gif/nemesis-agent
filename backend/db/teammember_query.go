@@ -12,11 +12,11 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
 	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/teteekoue/NemesisCode/backend/db/teammember"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // TeamMemberQuery is the builder for querying TeamMember entities.

@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/image"
 	"github.com/teteekoue/NemesisCode/backend/db/mcpupstream"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
@@ -22,7 +23,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/teammember"
 	"github.com/teteekoue/NemesisCode/backend/db/teammodel"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // TeamCreate is the builder for creating a Team entity.
@@ -160,6 +160,14 @@ func (_c *TeamCreate) SetNillableUpdatedAt(v *time.Time) *TeamCreate {
 // SetID sets the "id" field.
 func (_c *TeamCreate) SetID(v uuid.UUID) *TeamCreate {
 	_c.mutation.SetID(v)
+	return _c
+}
+
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *TeamCreate) SetNillableID(v *uuid.UUID) *TeamCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
 	return _c
 }
 
@@ -369,6 +377,13 @@ func (_c *TeamCreate) defaults() error {
 		v := team.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if team.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized team.DefaultID (forgotten import db/runtime?)")
+		}
+		v := team.DefaultID()
+		_c.mutation.SetID(v)
+	}
 	return nil
 }
 
@@ -521,6 +536,9 @@ func (_c *TeamCreate) createSpec() (*Team, *sqlgraph.CreateSpec) {
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ModelsIDs(); len(nodes) > 0 {
@@ -541,6 +559,9 @@ func (_c *TeamCreate) createSpec() (*Team, *sqlgraph.CreateSpec) {
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ImagesIDs(); len(nodes) > 0 {
@@ -561,6 +582,9 @@ func (_c *TeamCreate) createSpec() (*Team, *sqlgraph.CreateSpec) {
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ExtensionImageArchivesIDs(); len(nodes) > 0 {

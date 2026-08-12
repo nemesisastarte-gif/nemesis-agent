@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/gitidentity"
 	"github.com/teteekoue/NemesisCode/backend/db/host"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
@@ -20,7 +21,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/user"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachine"
 	"github.com/teteekoue/NemesisCode/backend/ent/types"
-	"github.com/google/uuid"
 )
 
 // VirtualMachineCreate is the builder for creating a VirtualMachine entity.
@@ -690,6 +690,9 @@ func (_c *VirtualMachineCreate) createSpec() (*VirtualMachine, *sqlgraph.CreateS
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.TaskVmsIDs(); len(nodes) > 0 {

@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
 	"github.com/teteekoue/NemesisCode/backend/db/modelapikey"
 	"github.com/teteekoue/NemesisCode/backend/db/modelpricing"
@@ -25,7 +26,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/teammodel"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachine"
-	"github.com/google/uuid"
 )
 
 // ModelQuery is the builder for querying Model entities.

@@ -11,10 +11,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
 	"github.com/teteekoue/NemesisCode/backend/db/modelpricing"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
-	"github.com/google/uuid"
 )
 
 // ModelPricingUpdate is the builder for updating ModelPricing entities.

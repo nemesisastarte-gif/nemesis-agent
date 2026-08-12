@@ -9,10 +9,10 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/projectissue"
 	"github.com/teteekoue/NemesisCode/backend/db/projectissuecomment"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // ProjectIssueComment is the model entity for the ProjectIssueComment schema.

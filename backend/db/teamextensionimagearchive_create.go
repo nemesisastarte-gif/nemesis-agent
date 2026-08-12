@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/image"
 	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/teteekoue/NemesisCode/backend/db/teamextensionimagearchive"
-	"github.com/google/uuid"
 )
 
 // TeamExtensionImageArchiveCreate is the builder for creating a TeamExtensionImageArchive entity.
@@ -128,6 +128,14 @@ func (_c *TeamExtensionImageArchiveCreate) SetID(v uuid.UUID) *TeamExtensionImag
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *TeamExtensionImageArchiveCreate) SetNillableID(v *uuid.UUID) *TeamExtensionImageArchiveCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetTeam sets the "team" edge to the Team entity.
 func (_c *TeamExtensionImageArchiveCreate) SetTeam(v *Team) *TeamExtensionImageArchiveCreate {
 	return _c.SetTeamID(v.ID)
@@ -180,6 +188,10 @@ func (_c *TeamExtensionImageArchiveCreate) defaults() {
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		v := teamextensionimagearchive.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := teamextensionimagearchive.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

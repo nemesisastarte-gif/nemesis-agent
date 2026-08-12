@@ -32,7 +32,7 @@ func (MCPTool) Mixin() []ent.Mixin {
 
 func (MCPTool) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("upstream_id", uuid.UUID{}),
 		field.String("name").NotEmpty().MaxLen(256),
 		field.String("namespaced_name").NotEmpty().MaxLen(320),

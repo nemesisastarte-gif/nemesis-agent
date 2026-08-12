@@ -9,8 +9,8 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/teteekoue/NemesisCode/backend/db/migrate"
 	"github.com/google/uuid"
+	"github.com/teteekoue/NemesisCode/backend/db/migrate"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"

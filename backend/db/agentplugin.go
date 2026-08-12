@@ -9,9 +9,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/agentplugin"
 	"github.com/teteekoue/NemesisCode/backend/db/agentpluginrepo"
-	"github.com/google/uuid"
 )
 
 // AgentPlugin is the model entity for the AgentPlugin schema.

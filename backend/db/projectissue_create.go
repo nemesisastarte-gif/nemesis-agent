@@ -12,13 +12,13 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/project"
 	"github.com/teteekoue/NemesisCode/backend/db/projectissue"
 	"github.com/teteekoue/NemesisCode/backend/db/projectissuecomment"
 	"github.com/teteekoue/NemesisCode/backend/db/projecttask"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // ProjectIssueCreate is the builder for creating a ProjectIssue entity.
@@ -179,6 +179,14 @@ func (_c *ProjectIssueCreate) SetID(v uuid.UUID) *ProjectIssueCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *ProjectIssueCreate) SetNillableID(v *uuid.UUID) *ProjectIssueCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_c *ProjectIssueCreate) SetUser(v *User) *ProjectIssueCreate {
 	return _c.SetUserID(v.ID)
@@ -282,6 +290,13 @@ func (_c *ProjectIssueCreate) defaults() error {
 		}
 		v := projectissue.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if projectissue.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized projectissue.DefaultID (forgotten import db/runtime?)")
+		}
+		v := projectissue.DefaultID()
+		_c.mutation.SetID(v)
 	}
 	return nil
 }

@@ -9,9 +9,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/teteekoue/NemesisCode/backend/db/teamoidcconfig"
-	"github.com/google/uuid"
 )
 
 // TeamOIDCConfig is the model entity for the TeamOIDCConfig schema.

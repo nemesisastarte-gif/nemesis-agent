@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/gitidentity"
 	"github.com/teteekoue/NemesisCode/backend/db/image"
@@ -17,7 +18,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/projectissue"
 	"github.com/teteekoue/NemesisCode/backend/db/projecttask"
 	"github.com/teteekoue/NemesisCode/backend/db/task"
-	"github.com/google/uuid"
 )
 
 // ProjectTask is the model entity for the ProjectTask schema.

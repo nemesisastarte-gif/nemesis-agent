@@ -35,7 +35,7 @@ func (Task) Mixin() []ent.Mixin {
 // Fields of the Task.
 func (Task) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}),
+		field.UUID("id", uuid.UUID{}).Default(uuid.New),
 		field.UUID("user_id", uuid.UUID{}),
 		field.String("kind").GoType(consts.TaskType("")),
 		field.String("sub_type").GoType(consts.TaskSubType("")).Optional(),

@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/agentsyncjob"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
 	"github.com/teteekoue/NemesisCode/backend/ent/types"
-	"github.com/google/uuid"
 )
 
 // AgentSyncJobUpdate is the builder for updating AgentSyncJob entities.

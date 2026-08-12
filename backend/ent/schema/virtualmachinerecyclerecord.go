@@ -25,7 +25,7 @@ func (VirtualMachineRecycleRecord) Annotations() []schema.Annotation {
 
 func (VirtualMachineRecycleRecord) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.String("virtualmachine_id").Unique(),
 		field.String("environment_id"),
 		field.String("host_id"),

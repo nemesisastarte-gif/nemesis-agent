@@ -9,9 +9,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/notifysendlog"
-	"github.com/google/uuid"
 )
 
 // NotifySendLog is the model entity for the NotifySendLog schema.

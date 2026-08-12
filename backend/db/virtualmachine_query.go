@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/gitidentity"
 	"github.com/teteekoue/NemesisCode/backend/db/host"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
@@ -21,7 +22,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/taskvirtualmachine"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachine"
-	"github.com/google/uuid"
 )
 
 // VirtualMachineQuery is the builder for querying VirtualMachine entities.

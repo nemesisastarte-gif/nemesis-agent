@@ -34,7 +34,7 @@ func (ProjectIssueComment) Mixin() []ent.Mixin {
 // Fields of the ProjectIssueComment.
 func (ProjectIssueComment) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("user_id", uuid.UUID{}),
 		field.UUID("issue_id", uuid.UUID{}),
 		field.UUID("parent_id", uuid.UUID{}).Optional(),

@@ -23,7 +23,7 @@ func (TeamExtensionImageArchive) Annotations() []schema.Annotation {
 
 func (TeamExtensionImageArchive) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("team_id", uuid.UUID{}),
 		field.UUID("image_id", uuid.UUID{}),
 		field.String("package_id").NotEmpty(),

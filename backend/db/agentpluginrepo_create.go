@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/agentplugin"
 	"github.com/teteekoue/NemesisCode/backend/db/agentpluginrepo"
 	"github.com/teteekoue/NemesisCode/backend/ent/types"
-	"github.com/google/uuid"
 )
 
 // AgentPluginRepoCreate is the builder for creating a AgentPluginRepo entity.

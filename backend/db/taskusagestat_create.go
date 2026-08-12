@@ -12,8 +12,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/teteekoue/NemesisCode/backend/db/taskusagestat"
 	"github.com/google/uuid"
+	"github.com/teteekoue/NemesisCode/backend/db/taskusagestat"
 )
 
 // TaskUsageStatCreate is the builder for creating a TaskUsageStat entity.

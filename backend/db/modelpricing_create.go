@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
 	"github.com/teteekoue/NemesisCode/backend/db/modelpricing"
-	"github.com/google/uuid"
 )
 
 // ModelPricingCreate is the builder for creating a ModelPricing entity.
@@ -113,6 +113,14 @@ func (_c *ModelPricingCreate) SetID(v uuid.UUID) *ModelPricingCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *ModelPricingCreate) SetNillableID(v *uuid.UUID) *ModelPricingCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetModel sets the "model" edge to the Model entity.
 func (_c *ModelPricingCreate) SetModel(v *Model) *ModelPricingCreate {
 	return _c.SetModelID(v.ID)
@@ -172,6 +180,10 @@ func (_c *ModelPricingCreate) defaults() {
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		v := modelpricing.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := modelpricing.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

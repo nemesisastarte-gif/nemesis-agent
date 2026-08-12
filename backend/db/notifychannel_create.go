@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/notifychannel"
 	"github.com/teteekoue/NemesisCode/backend/db/notifysubscription"
-	"github.com/google/uuid"
 )
 
 // NotifyChannelCreate is the builder for creating a NotifyChannel entity.
@@ -166,6 +166,14 @@ func (_c *NotifyChannelCreate) SetID(v uuid.UUID) *NotifyChannelCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *NotifyChannelCreate) SetNillableID(v *uuid.UUID) *NotifyChannelCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // AddSubscriptionIDs adds the "subscriptions" edge to the NotifySubscription entity by IDs.
 func (_c *NotifyChannelCreate) AddSubscriptionIDs(ids ...uuid.UUID) *NotifyChannelCreate {
 	_c.mutation.AddSubscriptionIDs(ids...)
@@ -247,6 +255,13 @@ func (_c *NotifyChannelCreate) defaults() error {
 		}
 		v := notifychannel.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if notifychannel.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized notifychannel.DefaultID (forgotten import db/runtime?)")
+		}
+		v := notifychannel.DefaultID()
+		_c.mutation.SetID(v)
 	}
 	return nil
 }

@@ -25,7 +25,7 @@ func (TeamGroupImage) Annotations() []schema.Annotation {
 // Fields of the TeamGroupImage.
 func (TeamGroupImage) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("group_id", uuid.UUID{}),
 		field.UUID("image_id", uuid.UUID{}),
 		field.Time("created_at").Default(time.Now),

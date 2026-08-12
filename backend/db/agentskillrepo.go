@@ -9,8 +9,8 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/teteekoue/NemesisCode/backend/db/agentskillrepo"
 	"github.com/google/uuid"
+	"github.com/teteekoue/NemesisCode/backend/db/agentskillrepo"
 )
 
 // AgentSkillRepo is the model entity for the AgentSkillRepo schema.

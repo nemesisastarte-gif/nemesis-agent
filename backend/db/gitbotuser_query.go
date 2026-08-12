@@ -12,11 +12,11 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/gitbot"
 	"github.com/teteekoue/NemesisCode/backend/db/gitbotuser"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // GitBotUserQuery is the builder for querying GitBotUser entities.

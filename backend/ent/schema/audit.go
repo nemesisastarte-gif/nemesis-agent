@@ -27,7 +27,7 @@ func (Audit) Annotations() []schema.Annotation {
 // Fields of the Audit.
 func (Audit) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}),
+		field.UUID("id", uuid.UUID{}).Default(uuid.New),
 		field.UUID("user_id", uuid.UUID{}),
 		field.String("operation"),
 		field.String("source_ip"),

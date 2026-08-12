@@ -12,8 +12,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/teteekoue/NemesisCode/backend/db/mcpusertoolsetting"
 	"github.com/google/uuid"
+	"github.com/teteekoue/NemesisCode/backend/db/mcpusertoolsetting"
 )
 
 // MCPUserToolSettingCreate is the builder for creating a MCPUserToolSetting entity.
@@ -84,6 +84,14 @@ func (_c *MCPUserToolSettingCreate) SetID(v uuid.UUID) *MCPUserToolSettingCreate
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *MCPUserToolSettingCreate) SetNillableID(v *uuid.UUID) *MCPUserToolSettingCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // Mutation returns the MCPUserToolSettingMutation object of the builder.
 func (_c *MCPUserToolSettingCreate) Mutation() *MCPUserToolSettingMutation {
 	return _c.mutation
@@ -130,6 +138,10 @@ func (_c *MCPUserToolSettingCreate) defaults() {
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		v := mcpusertoolsetting.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := mcpusertoolsetting.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

@@ -11,11 +11,11 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/agentskill"
 	"github.com/teteekoue/NemesisCode/backend/db/agentskillgroupbinding"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroup"
-	"github.com/google/uuid"
 )
 
 // AgentSkillGroupBindingUpdate is the builder for updating AgentSkillGroupBinding entities.

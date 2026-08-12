@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/mcptool"
 	"github.com/teteekoue/NemesisCode/backend/db/mcpupstream"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
@@ -18,7 +19,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroup"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroupmcpupstream"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // MCPUpstreamUpdate is the builder for updating MCPUpstream entities.
@@ -712,6 +712,9 @@ func (_u *MCPUpstreamUpdate) sqlSave(ctx context.Context) (_node int, err error)
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
 	if nodes := _u.mutation.RemovedGroupsIDs(); len(nodes) > 0 && !_u.mutation.GroupsCleared() {
@@ -732,6 +735,9 @@ func (_u *MCPUpstreamUpdate) sqlSave(ctx context.Context) (_node int, err error)
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
 	if nodes := _u.mutation.GroupsIDs(); len(nodes) > 0 {
@@ -752,6 +758,9 @@ func (_u *MCPUpstreamUpdate) sqlSave(ctx context.Context) (_node int, err error)
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.TeamGroupMcpUpstreamsCleared() {
@@ -1528,6 +1537,9 @@ func (_u *MCPUpstreamUpdateOne) sqlSave(ctx context.Context) (_node *MCPUpstream
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
 	if nodes := _u.mutation.RemovedGroupsIDs(); len(nodes) > 0 && !_u.mutation.GroupsCleared() {
@@ -1548,6 +1560,9 @@ func (_u *MCPUpstreamUpdateOne) sqlSave(ctx context.Context) (_node *MCPUpstream
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
 	if nodes := _u.mutation.GroupsIDs(); len(nodes) > 0 {
@@ -1568,6 +1583,9 @@ func (_u *MCPUpstreamUpdateOne) sqlSave(ctx context.Context) (_node *MCPUpstream
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.TeamGroupMcpUpstreamsCleared() {

@@ -24,7 +24,7 @@ func (MCPToolCall) Annotations() []schema.Annotation {
 
 func (MCPToolCall) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.String("request_id").NotEmpty().MaxLen(128).Unique(),
 		field.UUID("task_id", uuid.UUID{}),
 		field.UUID("user_id", uuid.UUID{}),

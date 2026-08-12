@@ -12,12 +12,12 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/mcpupstream"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
 	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroup"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroupmcpupstream"
-	"github.com/google/uuid"
 )
 
 // TeamGroupMCPUpstreamQuery is the builder for querying TeamGroupMCPUpstream entities.

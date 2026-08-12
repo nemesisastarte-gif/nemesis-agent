@@ -28,7 +28,7 @@ func (NotifySendLog) Annotations() []schema.Annotation {
 
 func (NotifySendLog) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("subscription_id", uuid.UUID{}),
 		field.UUID("channel_id", uuid.UUID{}),
 		field.String("event_type").GoType(consts.NotifyEventType("")),

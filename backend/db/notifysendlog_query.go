@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/notifysendlog"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
-	"github.com/google/uuid"
 )
 
 // NotifySendLogQuery is the builder for querying NotifySendLog entities.

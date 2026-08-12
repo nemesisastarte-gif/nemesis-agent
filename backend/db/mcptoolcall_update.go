@@ -11,11 +11,11 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/mcptool"
 	"github.com/teteekoue/NemesisCode/backend/db/mcptoolcall"
 	"github.com/teteekoue/NemesisCode/backend/db/mcpupstream"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
-	"github.com/google/uuid"
 )
 
 // MCPToolCallUpdate is the builder for updating MCPToolCall entities.

@@ -24,7 +24,7 @@ func (GitTask) Annotations() []schema.Annotation {
 // Fields of the GitTask.
 func (GitTask) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}),
+		field.UUID("id", uuid.UUID{}).Default(uuid.New),
 		field.UUID("task_id", uuid.UUID{}),
 		field.UUID("repo_id", uuid.UUID{}).Optional(),
 		field.String("subject_type").NotEmpty(),

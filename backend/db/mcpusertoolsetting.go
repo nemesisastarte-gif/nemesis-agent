@@ -9,8 +9,8 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/teteekoue/NemesisCode/backend/db/mcpusertoolsetting"
 	"github.com/google/uuid"
+	"github.com/teteekoue/NemesisCode/backend/db/mcpusertoolsetting"
 )
 
 // MCPUserToolSetting is the model entity for the MCPUserToolSetting schema.

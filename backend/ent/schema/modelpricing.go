@@ -25,7 +25,7 @@ func (ModelPricing) Annotations() []schema.Annotation {
 // Fields of the ModelPricing.
 func (ModelPricing) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("model_id", uuid.UUID{}).Unique(),
 		field.String("access_level").NotEmpty(),
 		field.Bool("is_free").Default(true),

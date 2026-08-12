@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/mcptool"
 	"github.com/teteekoue/NemesisCode/backend/db/mcpupstream"
-	"github.com/google/uuid"
 )
 
 // MCPToolCreate is the builder for creating a MCPTool entity.
@@ -201,6 +201,14 @@ func (_c *MCPToolCreate) SetID(v uuid.UUID) *MCPToolCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *MCPToolCreate) SetNillableID(v *uuid.UUID) *MCPToolCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetUpstream sets the "upstream" edge to the MCPUpstream entity.
 func (_c *MCPToolCreate) SetUpstream(v *MCPUpstream) *MCPToolCreate {
 	return _c.SetUpstreamID(v.ID)
@@ -264,6 +272,13 @@ func (_c *MCPToolCreate) defaults() error {
 		}
 		v := mcptool.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if mcptool.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized mcptool.DefaultID (forgotten import db/runtime?)")
+		}
+		v := mcptool.DefaultID()
+		_c.mutation.SetID(v)
 	}
 	return nil
 }

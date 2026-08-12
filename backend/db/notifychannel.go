@@ -10,9 +10,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/notifychannel"
-	"github.com/google/uuid"
 )
 
 // NotifyChannel is the model entity for the NotifyChannel schema.

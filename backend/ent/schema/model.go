@@ -34,7 +34,7 @@ func (Model) Mixin() []ent.Mixin {
 // Fields of the Model.
 func (Model) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("user_id", uuid.UUID{}),
 		field.String("provider").NotEmpty(),
 		field.Text("api_key").NotEmpty(),

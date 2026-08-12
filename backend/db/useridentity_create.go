@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
 	"github.com/teteekoue/NemesisCode/backend/db/useridentity"
-	"github.com/google/uuid"
 )
 
 // UserIdentityCreate is the builder for creating a UserIdentity entity.
@@ -126,6 +126,14 @@ func (_c *UserIdentityCreate) SetID(v uuid.UUID) *UserIdentityCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *UserIdentityCreate) SetNillableID(v *uuid.UUID) *UserIdentityCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_c *UserIdentityCreate) SetUser(v *User) *UserIdentityCreate {
 	return _c.SetUserID(v.ID)
@@ -174,6 +182,13 @@ func (_c *UserIdentityCreate) defaults() error {
 		}
 		v := useridentity.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if useridentity.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized useridentity.DefaultID (forgotten import db/runtime?)")
+		}
+		v := useridentity.DefaultID()
+		_c.mutation.SetID(v)
 	}
 	return nil
 }

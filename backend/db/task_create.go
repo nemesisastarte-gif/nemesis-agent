@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/gitbottask"
 	"github.com/teteekoue/NemesisCode/backend/db/gittask"
@@ -21,7 +22,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/taskvirtualmachine"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachine"
-	"github.com/google/uuid"
 )
 
 // TaskCreate is the builder for creating a Task entity.
@@ -200,6 +200,14 @@ func (_c *TaskCreate) SetID(v uuid.UUID) *TaskCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *TaskCreate) SetNillableID(v *uuid.UUID) *TaskCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // AddProjectTaskIDs adds the "project_tasks" edge to the ProjectTask entity by IDs.
 func (_c *TaskCreate) AddProjectTaskIDs(ids ...uuid.UUID) *TaskCreate {
 	_c.mutation.AddProjectTaskIDs(ids...)
@@ -356,6 +364,13 @@ func (_c *TaskCreate) defaults() error {
 		}
 		v := task.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if task.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized task.DefaultID (forgotten import db/runtime?)")
+		}
+		v := task.DefaultID()
+		_c.mutation.SetID(v)
 	}
 	return nil
 }
@@ -550,6 +565,9 @@ func (_c *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.GitBotTasksIDs(); len(nodes) > 0 {

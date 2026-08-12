@@ -12,11 +12,11 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
 	"github.com/teteekoue/NemesisCode/backend/db/task"
 	"github.com/teteekoue/NemesisCode/backend/db/taskmodelswitch"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // TaskModelSwitchCreate is the builder for creating a TaskModelSwitch entity.

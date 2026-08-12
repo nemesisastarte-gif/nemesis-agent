@@ -73,6 +73,10 @@ export default function LoginPage({
         const { email, password } = JSON.parse(savedUser)
         if (email) setUserEmail(email)
         if (password) setUserPassword(password)
+      } else if (IS_OFFLINE_EDITION) {
+        // Mode local : identifiants par défaut Admin / Admin.
+        setUserEmail("Admin")
+        setUserPassword("Admin")
       }
       const savedManager = localStorage.getItem(MANAGER_STORAGE_KEY)
       if (savedManager) {
@@ -192,6 +196,99 @@ export default function LoginPage({
     }
     setLogging(false)
 
+  }
+
+  // Mode local (offline) : pas de cloud, pas d'inscription, pas d'OAuth.
+  // Interface unique : nom d'utilisateur + mot de passe (défaut Admin/Admin).
+  const handleSimpleLogin = async () => {
+    if (userEmail.trim() === '' || userPassword.trim() === '') {
+      toast.error(t("login.toast.missingCredentials"))
+      return
+    }
+    setLogging(true)
+    await apiRequest('v1UsersPasswordLoginCreate', {
+      email: userEmail.trim(),
+      password: userPassword.trim(),
+      captcha_token: '',
+    }, [], async (resp) => {
+      if (resp.code === 0) {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify({ email: userEmail.trim(), password: userPassword.trim() }))
+        await reloadAuth()
+        navigate('/console/tasks')
+      } else {
+        toast.error(t("login.simple.failed"))
+      }
+    })
+    setLogging(false)
+  }
+
+  if (IS_OFFLINE_EDITION) {
+    return (
+      <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+        <div className="w-full max-w-sm">
+          <div className={cn("flex flex-col gap-6", className)} {...props}>
+            <div className="flex flex-col items-center gap-3 text-center">
+              <img src="/logo-colored.png" alt="NemesisCode" className="size-16 rounded-2xl" />
+              <h1 className="text-2xl font-semibold tracking-tight">{t("login.simple.welcome")}</h1>
+              <p className="text-sm text-muted-foreground">{t("login.title")}</p>
+            </div>
+            <Card>
+              <CardContent>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void handleSimpleLogin()
+                  }}
+                  className="mt-1 flex flex-col gap-5"
+                >
+                  <FieldGroup className="gap-5">
+                    <Field>
+                      <FieldLabel htmlFor="simple-username">{t("login.simple.username")}</FieldLabel>
+                      <Input
+                        id="simple-username"
+                        value={userEmail}
+                        placeholder="Admin"
+                        autoComplete="username"
+                        onChange={(e) => setUserEmail(e.target.value)}
+                        disabled={logging}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="simple-password">{t("login.simple.password")}</FieldLabel>
+                      <div className="relative">
+                        <Input
+                          id="simple-password"
+                          type={showUserPassword ? "text" : "password"}
+                          value={userPassword}
+                          placeholder="Admin"
+                          autoComplete="current-password"
+                          onChange={(e) => setUserPassword(e.target.value)}
+                          disabled={logging}
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground"
+                          onClick={() => setShowUserPassword((v) => !v)}
+                          aria-label={showUserPassword ? "hide" : "show"}
+                        >
+                          {showUserPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
+                    </Field>
+                  </FieldGroup>
+                  <Button type="submit" size="lg" className="w-full" disabled={logging}>
+                    {logging && <Spinner className="size-4" />}
+                    {t("login.simple.signIn")}
+                  </Button>
+                  <p className="text-center text-xs text-muted-foreground">{t("login.simple.hint")}</p>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/gittask"
 	"github.com/teteekoue/NemesisCode/backend/db/task"
-	"github.com/google/uuid"
 )
 
 // GitTaskCreate is the builder for creating a GitTask entity.
@@ -169,6 +169,14 @@ func (_c *GitTaskCreate) SetID(v uuid.UUID) *GitTaskCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *GitTaskCreate) SetNillableID(v *uuid.UUID) *GitTaskCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetTask sets the "task" edge to the Task entity.
 func (_c *GitTaskCreate) SetTask(v *Task) *GitTaskCreate {
 	return _c.SetTaskID(v.ID)
@@ -212,6 +220,10 @@ func (_c *GitTaskCreate) defaults() {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := gittask.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := gittask.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

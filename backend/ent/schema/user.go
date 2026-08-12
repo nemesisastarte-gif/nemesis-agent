@@ -34,7 +34,7 @@ func (User) Mixin() []ent.Mixin {
 // Fields of the User.
 func (User) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.String("name").NotEmpty(),
 		field.String("email").Optional(),
 		field.String("avatar_url").Optional(),

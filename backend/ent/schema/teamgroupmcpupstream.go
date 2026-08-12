@@ -27,7 +27,7 @@ func (TeamGroupMCPUpstream) Annotations() []schema.Annotation {
 
 func (TeamGroupMCPUpstream) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("team_id", uuid.UUID{}),
 		field.UUID("group_id", uuid.UUID{}),
 		field.UUID("upstream_id", uuid.UUID{}),

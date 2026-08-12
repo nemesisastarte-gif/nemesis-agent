@@ -23,7 +23,7 @@ func (MCPUserToolSetting) Annotations() []schema.Annotation {
 
 func (MCPUserToolSetting) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("user_id", uuid.UUID{}),
 		field.UUID("tool_id", uuid.UUID{}),
 		field.Bool("enabled").Default(true),

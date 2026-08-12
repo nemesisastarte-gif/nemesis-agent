@@ -33,7 +33,7 @@ func (ModelApiKey) Mixin() []ent.Mixin {
 // Fields of the ModelApiKey.
 func (ModelApiKey) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("model_id", uuid.UUID{}).Optional(),
 		field.UUID("user_id", uuid.UUID{}),
 		field.Enum("kind").Values("runtime", "ohmyagent").Default("runtime"),

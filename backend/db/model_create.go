@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
 	"github.com/teteekoue/NemesisCode/backend/db/modelapikey"
 	"github.com/teteekoue/NemesisCode/backend/db/modelpricing"
@@ -23,7 +24,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/teammodel"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachine"
-	"github.com/google/uuid"
 )
 
 // ModelCreate is the builder for creating a Model entity.
@@ -280,6 +280,14 @@ func (_c *ModelCreate) SetID(v uuid.UUID) *ModelCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *ModelCreate) SetNillableID(v *uuid.UUID) *ModelCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_c *ModelCreate) SetUser(v *User) *ModelCreate {
 	return _c.SetUserID(v.ID)
@@ -514,6 +522,13 @@ func (_c *ModelCreate) defaults() error {
 		v := model.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if model.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized model.DefaultID (forgotten import db/runtime?)")
+		}
+		v := model.DefaultID()
+		_c.mutation.SetID(v)
+	}
 	return nil
 }
 
@@ -728,6 +743,9 @@ func (_c *ModelCreate) createSpec() (*Model, *sqlgraph.CreateSpec) {
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.GroupsIDs(); len(nodes) > 0 {
@@ -748,6 +766,9 @@ func (_c *ModelCreate) createSpec() (*Model, *sqlgraph.CreateSpec) {
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.VmsIDs(); len(nodes) > 0 {

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/audit"
 	"github.com/teteekoue/NemesisCode/backend/db/gitbot"
 	"github.com/teteekoue/NemesisCode/backend/db/host"
@@ -27,7 +28,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/teamgrouphost"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroupmcpupstream"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroupmodel"
-	"github.com/google/uuid"
 )
 
 type Cursor struct {

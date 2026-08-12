@@ -12,13 +12,13 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/mcptool"
 	"github.com/teteekoue/NemesisCode/backend/db/mcpupstream"
 	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroup"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroupmcpupstream"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
-	"github.com/google/uuid"
 )
 
 // MCPUpstreamCreate is the builder for creating a MCPUpstream entity.
@@ -233,6 +233,14 @@ func (_c *MCPUpstreamCreate) SetID(v uuid.UUID) *MCPUpstreamCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *MCPUpstreamCreate) SetNillableID(v *uuid.UUID) *MCPUpstreamCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // AddToolIDs adds the "tools" edge to the MCPTool entity by IDs.
 func (_c *MCPUpstreamCreate) AddToolIDs(ids ...uuid.UUID) *MCPUpstreamCreate {
 	_c.mutation.AddToolIDs(ids...)
@@ -354,6 +362,13 @@ func (_c *MCPUpstreamCreate) defaults() error {
 		}
 		v := mcpupstream.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if mcpupstream.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized mcpupstream.DefaultID (forgotten import db/runtime?)")
+		}
+		v := mcpupstream.DefaultID()
+		_c.mutation.SetID(v)
 	}
 	return nil
 }
@@ -589,6 +604,9 @@ func (_c *MCPUpstreamCreate) createSpec() (*MCPUpstream, *sqlgraph.CreateSpec) {
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		if specE.ID.Value != nil {
+			edge.Target.Fields = append(edge.Target.Fields, specE.ID)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.TeamGroupMcpUpstreamsIDs(); len(nodes) > 0 {

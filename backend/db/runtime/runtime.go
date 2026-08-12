@@ -5,6 +5,7 @@ package runtime
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/agentplugin"
 	"github.com/teteekoue/NemesisCode/backend/db/agentpluginrepo"
@@ -62,7 +63,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachine"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachinerecyclerecord"
 	"github.com/teteekoue/NemesisCode/backend/ent/schema"
-	"github.com/google/uuid"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -333,6 +333,10 @@ func init() {
 	auditDescCreatedAt := auditFields[7].Descriptor()
 	// audit.DefaultCreatedAt holds the default value on creation for the created_at field.
 	audit.DefaultCreatedAt = auditDescCreatedAt.Default.(func() time.Time)
+	// auditDescID is the schema descriptor for id field.
+	auditDescID := auditFields[0].Descriptor()
+	// audit.DefaultID holds the default value on creation for the id field.
+	audit.DefaultID = auditDescID.Default.(func() uuid.UUID)
 	gitbotMixin := schema.GitBot{}.Mixin()
 	gitbotMixinHooks0 := gitbotMixin[0].Hooks()
 	gitbot.Hooks[0] = gitbotMixinHooks0[0]
@@ -344,6 +348,10 @@ func init() {
 	gitbotDescCreatedAt := gitbotFields[7].Descriptor()
 	// gitbot.DefaultCreatedAt holds the default value on creation for the created_at field.
 	gitbot.DefaultCreatedAt = gitbotDescCreatedAt.Default.(func() time.Time)
+	// gitbotDescID is the schema descriptor for id field.
+	gitbotDescID := gitbotFields[0].Descriptor()
+	// gitbot.DefaultID holds the default value on creation for the id field.
+	gitbot.DefaultID = gitbotDescID.Default.(func() uuid.UUID)
 	gitbottaskFields := schema.GitBotTask{}.Fields()
 	_ = gitbottaskFields
 	// gitbottaskDescCreatedAt is the schema descriptor for created_at field.
@@ -381,6 +389,10 @@ func init() {
 	gitidentity.DefaultUpdatedAt = gitidentityDescUpdatedAt.Default.(func() time.Time)
 	// gitidentity.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	gitidentity.UpdateDefaultUpdatedAt = gitidentityDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// gitidentityDescID is the schema descriptor for id field.
+	gitidentityDescID := gitidentityFields[0].Descriptor()
+	// gitidentity.DefaultID holds the default value on creation for the id field.
+	gitidentity.DefaultID = gitidentityDescID.Default.(func() uuid.UUID)
 	gittaskFields := schema.GitTask{}.Fields()
 	_ = gittaskFields
 	// gittaskDescSubjectType is the schema descriptor for subject_type field.
@@ -391,6 +403,10 @@ func init() {
 	gittaskDescCreatedAt := gittaskFields[11].Descriptor()
 	// gittask.DefaultCreatedAt holds the default value on creation for the created_at field.
 	gittask.DefaultCreatedAt = gittaskDescCreatedAt.Default.(func() time.Time)
+	// gittaskDescID is the schema descriptor for id field.
+	gittaskDescID := gittaskFields[0].Descriptor()
+	// gittask.DefaultID holds the default value on creation for the id field.
+	gittask.DefaultID = gittaskDescID.Default.(func() uuid.UUID)
 	hostMixin := schema.Host{}.Mixin()
 	hostMixinHooks0 := hostMixin[0].Hooks()
 	host.Hooks[0] = hostMixinHooks0[0]
@@ -433,6 +449,10 @@ func init() {
 	image.DefaultUpdatedAt = imageDescUpdatedAt.Default.(func() time.Time)
 	// image.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	image.UpdateDefaultUpdatedAt = imageDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// imageDescID is the schema descriptor for id field.
+	imageDescID := imageFields[0].Descriptor()
+	// image.DefaultID holds the default value on creation for the id field.
+	image.DefaultID = imageDescID.Default.(func() uuid.UUID)
 	mcptoolMixin := schema.MCPTool{}.Mixin()
 	mcptoolMixinHooks0 := mcptoolMixin[0].Hooks()
 	mcptool.Hooks[0] = mcptoolMixinHooks0[0]
@@ -498,6 +518,10 @@ func init() {
 	mcptool.DefaultUpdatedAt = mcptoolDescUpdatedAt.Default.(func() time.Time)
 	// mcptool.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	mcptool.UpdateDefaultUpdatedAt = mcptoolDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// mcptoolDescID is the schema descriptor for id field.
+	mcptoolDescID := mcptoolFields[0].Descriptor()
+	// mcptool.DefaultID holds the default value on creation for the id field.
+	mcptool.DefaultID = mcptoolDescID.Default.(func() uuid.UUID)
 	mcptoolcallFields := schema.MCPToolCall{}.Fields()
 	_ = mcptoolcallFields
 	// mcptoolcallDescRequestID is the schema descriptor for request_id field.
@@ -558,6 +582,10 @@ func init() {
 	mcptoolcall.DefaultUpdatedAt = mcptoolcallDescUpdatedAt.Default.(func() time.Time)
 	// mcptoolcall.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	mcptoolcall.UpdateDefaultUpdatedAt = mcptoolcallDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// mcptoolcallDescID is the schema descriptor for id field.
+	mcptoolcallDescID := mcptoolcallFields[0].Descriptor()
+	// mcptoolcall.DefaultID holds the default value on creation for the id field.
+	mcptoolcall.DefaultID = mcptoolcallDescID.Default.(func() uuid.UUID)
 	mcpupstreamMixin := schema.MCPUpstream{}.Mixin()
 	mcpupstreamMixinHooks0 := mcpupstreamMixin[0].Hooks()
 	mcpupstream.Hooks[0] = mcpupstreamMixinHooks0[0]
@@ -679,6 +707,10 @@ func init() {
 	mcpupstream.DefaultUpdatedAt = mcpupstreamDescUpdatedAt.Default.(func() time.Time)
 	// mcpupstream.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	mcpupstream.UpdateDefaultUpdatedAt = mcpupstreamDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// mcpupstreamDescID is the schema descriptor for id field.
+	mcpupstreamDescID := mcpupstreamFields[0].Descriptor()
+	// mcpupstream.DefaultID holds the default value on creation for the id field.
+	mcpupstream.DefaultID = mcpupstreamDescID.Default.(func() uuid.UUID)
 	mcpusertoolsettingFields := schema.MCPUserToolSetting{}.Fields()
 	_ = mcpusertoolsettingFields
 	// mcpusertoolsettingDescEnabled is the schema descriptor for enabled field.
@@ -695,6 +727,10 @@ func init() {
 	mcpusertoolsetting.DefaultUpdatedAt = mcpusertoolsettingDescUpdatedAt.Default.(func() time.Time)
 	// mcpusertoolsetting.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	mcpusertoolsetting.UpdateDefaultUpdatedAt = mcpusertoolsettingDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// mcpusertoolsettingDescID is the schema descriptor for id field.
+	mcpusertoolsettingDescID := mcpusertoolsettingFields[0].Descriptor()
+	// mcpusertoolsetting.DefaultID holds the default value on creation for the id field.
+	mcpusertoolsetting.DefaultID = mcpusertoolsettingDescID.Default.(func() uuid.UUID)
 	modelMixin := schema.Model{}.Mixin()
 	modelMixinHooks0 := modelMixin[0].Hooks()
 	model.Hooks[0] = modelMixinHooks0[0]
@@ -752,6 +788,10 @@ func init() {
 	model.DefaultUpdatedAt = modelDescUpdatedAt.Default.(func() time.Time)
 	// model.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	model.UpdateDefaultUpdatedAt = modelDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// modelDescID is the schema descriptor for id field.
+	modelDescID := modelFields[0].Descriptor()
+	// model.DefaultID holds the default value on creation for the id field.
+	model.DefaultID = modelDescID.Default.(func() uuid.UUID)
 	modelapikeyMixin := schema.ModelApiKey{}.Mixin()
 	modelapikeyMixinHooks0 := modelapikeyMixin[0].Hooks()
 	modelapikey.Hooks[0] = modelapikeyMixinHooks0[0]
@@ -771,6 +811,10 @@ func init() {
 	modelapikeyDescCreatedAt := modelapikeyFields[7].Descriptor()
 	// modelapikey.DefaultCreatedAt holds the default value on creation for the created_at field.
 	modelapikey.DefaultCreatedAt = modelapikeyDescCreatedAt.Default.(func() time.Time)
+	// modelapikeyDescID is the schema descriptor for id field.
+	modelapikeyDescID := modelapikeyFields[0].Descriptor()
+	// modelapikey.DefaultID holds the default value on creation for the id field.
+	modelapikey.DefaultID = modelapikeyDescID.Default.(func() uuid.UUID)
 	modelpricingFields := schema.ModelPricing{}.Fields()
 	_ = modelpricingFields
 	// modelpricingDescAccessLevel is the schema descriptor for access_level field.
@@ -799,6 +843,10 @@ func init() {
 	modelpricing.DefaultUpdatedAt = modelpricingDescUpdatedAt.Default.(func() time.Time)
 	// modelpricing.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	modelpricing.UpdateDefaultUpdatedAt = modelpricingDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// modelpricingDescID is the schema descriptor for id field.
+	modelpricingDescID := modelpricingFields[0].Descriptor()
+	// modelpricing.DefaultID holds the default value on creation for the id field.
+	modelpricing.DefaultID = modelpricingDescID.Default.(func() uuid.UUID)
 	notifychannelMixin := schema.NotifyChannel{}.Mixin()
 	notifychannelMixinHooks0 := notifychannelMixin[0].Hooks()
 	notifychannel.Hooks[0] = notifychannelMixinHooks0[0]
@@ -850,6 +898,10 @@ func init() {
 	notifychannel.DefaultUpdatedAt = notifychannelDescUpdatedAt.Default.(func() time.Time)
 	// notifychannel.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	notifychannel.UpdateDefaultUpdatedAt = notifychannelDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// notifychannelDescID is the schema descriptor for id field.
+	notifychannelDescID := notifychannelFields[0].Descriptor()
+	// notifychannel.DefaultID holds the default value on creation for the id field.
+	notifychannel.DefaultID = notifychannelDescID.Default.(func() uuid.UUID)
 	notifysendlogFields := schema.NotifySendLog{}.Fields()
 	_ = notifysendlogFields
 	// notifysendlogDescError is the schema descriptor for error field.
@@ -860,6 +912,10 @@ func init() {
 	notifysendlogDescCreatedAt := notifysendlogFields[7].Descriptor()
 	// notifysendlog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	notifysendlog.DefaultCreatedAt = notifysendlogDescCreatedAt.Default.(func() time.Time)
+	// notifysendlogDescID is the schema descriptor for id field.
+	notifysendlogDescID := notifysendlogFields[0].Descriptor()
+	// notifysendlog.DefaultID holds the default value on creation for the id field.
+	notifysendlog.DefaultID = notifysendlogDescID.Default.(func() uuid.UUID)
 	notifysubscriptionMixin := schema.NotifySubscription{}.Mixin()
 	notifysubscriptionMixinHooks0 := notifysubscriptionMixin[0].Hooks()
 	notifysubscription.Hooks[0] = notifysubscriptionMixinHooks0[0]
@@ -885,6 +941,10 @@ func init() {
 	notifysubscription.DefaultUpdatedAt = notifysubscriptionDescUpdatedAt.Default.(func() time.Time)
 	// notifysubscription.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	notifysubscription.UpdateDefaultUpdatedAt = notifysubscriptionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// notifysubscriptionDescID is the schema descriptor for id field.
+	notifysubscriptionDescID := notifysubscriptionFields[0].Descriptor()
+	// notifysubscription.DefaultID holds the default value on creation for the id field.
+	notifysubscription.DefaultID = notifysubscriptionDescID.Default.(func() uuid.UUID)
 	projectMixin := schema.Project{}.Mixin()
 	projectMixinHooks0 := projectMixin[0].Hooks()
 	project.Hooks[0] = projectMixinHooks0[0]
@@ -906,6 +966,10 @@ func init() {
 	project.DefaultUpdatedAt = projectDescUpdatedAt.Default.(func() time.Time)
 	// project.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	project.UpdateDefaultUpdatedAt = projectDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// projectDescID is the schema descriptor for id field.
+	projectDescID := projectFields[0].Descriptor()
+	// project.DefaultID holds the default value on creation for the id field.
+	project.DefaultID = projectDescID.Default.(func() uuid.UUID)
 	projectcollaboratorMixin := schema.ProjectCollaborator{}.Mixin()
 	projectcollaboratorMixinHooks0 := projectcollaboratorMixin[0].Hooks()
 	projectcollaborator.Hooks[0] = projectcollaboratorMixinHooks0[0]
@@ -927,6 +991,10 @@ func init() {
 	projectcollaborator.DefaultUpdatedAt = projectcollaboratorDescUpdatedAt.Default.(func() time.Time)
 	// projectcollaborator.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	projectcollaborator.UpdateDefaultUpdatedAt = projectcollaboratorDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// projectcollaboratorDescID is the schema descriptor for id field.
+	projectcollaboratorDescID := projectcollaboratorFields[0].Descriptor()
+	// projectcollaborator.DefaultID holds the default value on creation for the id field.
+	projectcollaborator.DefaultID = projectcollaboratorDescID.Default.(func() uuid.UUID)
 	projectgitbotFields := schema.ProjectGitBot{}.Fields()
 	_ = projectgitbotFields
 	// projectgitbotDescCreatedAt is the schema descriptor for created_at field.
@@ -966,6 +1034,10 @@ func init() {
 	projectissue.DefaultUpdatedAt = projectissueDescUpdatedAt.Default.(func() time.Time)
 	// projectissue.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	projectissue.UpdateDefaultUpdatedAt = projectissueDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// projectissueDescID is the schema descriptor for id field.
+	projectissueDescID := projectissueFields[0].Descriptor()
+	// projectissue.DefaultID holds the default value on creation for the id field.
+	projectissue.DefaultID = projectissueDescID.Default.(func() uuid.UUID)
 	projectissuecommentMixin := schema.ProjectIssueComment{}.Mixin()
 	projectissuecommentMixinHooks0 := projectissuecommentMixin[0].Hooks()
 	projectissuecomment.Hooks[0] = projectissuecommentMixinHooks0[0]
@@ -987,12 +1059,20 @@ func init() {
 	projectissuecomment.DefaultUpdatedAt = projectissuecommentDescUpdatedAt.Default.(func() time.Time)
 	// projectissuecomment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	projectissuecomment.UpdateDefaultUpdatedAt = projectissuecommentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// projectissuecommentDescID is the schema descriptor for id field.
+	projectissuecommentDescID := projectissuecommentFields[0].Descriptor()
+	// projectissuecomment.DefaultID holds the default value on creation for the id field.
+	projectissuecomment.DefaultID = projectissuecommentDescID.Default.(func() uuid.UUID)
 	projecttaskFields := schema.ProjectTask{}.Fields()
 	_ = projecttaskFields
 	// projecttaskDescCreatedAt is the schema descriptor for created_at field.
 	projecttaskDescCreatedAt := projecttaskFields[11].Descriptor()
 	// projecttask.DefaultCreatedAt holds the default value on creation for the created_at field.
 	projecttask.DefaultCreatedAt = projecttaskDescCreatedAt.Default.(func() time.Time)
+	// projecttaskDescID is the schema descriptor for id field.
+	projecttaskDescID := projecttaskFields[0].Descriptor()
+	// projecttask.DefaultID holds the default value on creation for the id field.
+	projecttask.DefaultID = projecttaskDescID.Default.(func() uuid.UUID)
 	taskMixin := schema.Task{}.Mixin()
 	taskMixinHooks0 := taskMixin[0].Hooks()
 	task.Hooks[0] = taskMixinHooks0[0]
@@ -1018,6 +1098,10 @@ func init() {
 	task.DefaultUpdatedAt = taskDescUpdatedAt.Default.(func() time.Time)
 	// task.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	task.UpdateDefaultUpdatedAt = taskDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// taskDescID is the schema descriptor for id field.
+	taskDescID := taskFields[0].Descriptor()
+	// task.DefaultID holds the default value on creation for the id field.
+	task.DefaultID = taskDescID.Default.(func() uuid.UUID)
 	taskmodelswitchFields := schema.TaskModelSwitch{}.Fields()
 	_ = taskmodelswitchFields
 	// taskmodelswitchDescRequestID is the schema descriptor for request_id field.
@@ -1082,6 +1166,10 @@ func init() {
 	taskvirtualmachineDescCreatedAt := taskvirtualmachineFields[3].Descriptor()
 	// taskvirtualmachine.DefaultCreatedAt holds the default value on creation for the created_at field.
 	taskvirtualmachine.DefaultCreatedAt = taskvirtualmachineDescCreatedAt.Default.(func() time.Time)
+	// taskvirtualmachineDescID is the schema descriptor for id field.
+	taskvirtualmachineDescID := taskvirtualmachineFields[0].Descriptor()
+	// taskvirtualmachine.DefaultID holds the default value on creation for the id field.
+	taskvirtualmachine.DefaultID = taskvirtualmachineDescID.Default.(func() uuid.UUID)
 	teamMixin := schema.Team{}.Mixin()
 	teamMixinHooks0 := teamMixin[0].Hooks()
 	team.Hooks[0] = teamMixinHooks0[0]
@@ -1123,6 +1211,10 @@ func init() {
 	teamDescUpdatedAt := teamFields[9].Descriptor()
 	// team.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	team.DefaultUpdatedAt = teamDescUpdatedAt.Default.(func() time.Time)
+	// teamDescID is the schema descriptor for id field.
+	teamDescID := teamFields[0].Descriptor()
+	// team.DefaultID holds the default value on creation for the id field.
+	team.DefaultID = teamDescID.Default.(func() uuid.UUID)
 	teamextensionimagearchiveFields := schema.TeamExtensionImageArchive{}.Fields()
 	_ = teamextensionimagearchiveFields
 	// teamextensionimagearchiveDescPackageID is the schema descriptor for package_id field.
@@ -1163,6 +1255,10 @@ func init() {
 	teamextensionimagearchive.DefaultUpdatedAt = teamextensionimagearchiveDescUpdatedAt.Default.(func() time.Time)
 	// teamextensionimagearchive.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	teamextensionimagearchive.UpdateDefaultUpdatedAt = teamextensionimagearchiveDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// teamextensionimagearchiveDescID is the schema descriptor for id field.
+	teamextensionimagearchiveDescID := teamextensionimagearchiveFields[0].Descriptor()
+	// teamextensionimagearchive.DefaultID holds the default value on creation for the id field.
+	teamextensionimagearchive.DefaultID = teamextensionimagearchiveDescID.Default.(func() uuid.UUID)
 	teamgroupMixin := schema.TeamGroup{}.Mixin()
 	teamgroupMixinHooks0 := teamgroupMixin[0].Hooks()
 	teamgroup.Hooks[0] = teamgroupMixinHooks0[0]
@@ -1180,18 +1276,30 @@ func init() {
 	teamgroup.DefaultUpdatedAt = teamgroupDescUpdatedAt.Default.(func() time.Time)
 	// teamgroup.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	teamgroup.UpdateDefaultUpdatedAt = teamgroupDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// teamgroupDescID is the schema descriptor for id field.
+	teamgroupDescID := teamgroupFields[0].Descriptor()
+	// teamgroup.DefaultID holds the default value on creation for the id field.
+	teamgroup.DefaultID = teamgroupDescID.Default.(func() uuid.UUID)
 	teamgrouphostFields := schema.TeamGroupHost{}.Fields()
 	_ = teamgrouphostFields
 	// teamgrouphostDescCreatedAt is the schema descriptor for created_at field.
 	teamgrouphostDescCreatedAt := teamgrouphostFields[3].Descriptor()
 	// teamgrouphost.DefaultCreatedAt holds the default value on creation for the created_at field.
 	teamgrouphost.DefaultCreatedAt = teamgrouphostDescCreatedAt.Default.(func() time.Time)
+	// teamgrouphostDescID is the schema descriptor for id field.
+	teamgrouphostDescID := teamgrouphostFields[0].Descriptor()
+	// teamgrouphost.DefaultID holds the default value on creation for the id field.
+	teamgrouphost.DefaultID = teamgrouphostDescID.Default.(func() uuid.UUID)
 	teamgroupimageFields := schema.TeamGroupImage{}.Fields()
 	_ = teamgroupimageFields
 	// teamgroupimageDescCreatedAt is the schema descriptor for created_at field.
 	teamgroupimageDescCreatedAt := teamgroupimageFields[3].Descriptor()
 	// teamgroupimage.DefaultCreatedAt holds the default value on creation for the created_at field.
 	teamgroupimage.DefaultCreatedAt = teamgroupimageDescCreatedAt.Default.(func() time.Time)
+	// teamgroupimageDescID is the schema descriptor for id field.
+	teamgroupimageDescID := teamgroupimageFields[0].Descriptor()
+	// teamgroupimage.DefaultID holds the default value on creation for the id field.
+	teamgroupimage.DefaultID = teamgroupimageDescID.Default.(func() uuid.UUID)
 	teamgroupmcpupstreamFields := schema.TeamGroupMCPUpstream{}.Fields()
 	_ = teamgroupmcpupstreamFields
 	// teamgroupmcpupstreamDescCreatedAt is the schema descriptor for created_at field.
@@ -1204,42 +1312,70 @@ func init() {
 	teamgroupmcpupstream.DefaultUpdatedAt = teamgroupmcpupstreamDescUpdatedAt.Default.(func() time.Time)
 	// teamgroupmcpupstream.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	teamgroupmcpupstream.UpdateDefaultUpdatedAt = teamgroupmcpupstreamDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// teamgroupmcpupstreamDescID is the schema descriptor for id field.
+	teamgroupmcpupstreamDescID := teamgroupmcpupstreamFields[0].Descriptor()
+	// teamgroupmcpupstream.DefaultID holds the default value on creation for the id field.
+	teamgroupmcpupstream.DefaultID = teamgroupmcpupstreamDescID.Default.(func() uuid.UUID)
 	teamgroupmemberFields := schema.TeamGroupMember{}.Fields()
 	_ = teamgroupmemberFields
 	// teamgroupmemberDescCreatedAt is the schema descriptor for created_at field.
 	teamgroupmemberDescCreatedAt := teamgroupmemberFields[3].Descriptor()
 	// teamgroupmember.DefaultCreatedAt holds the default value on creation for the created_at field.
 	teamgroupmember.DefaultCreatedAt = teamgroupmemberDescCreatedAt.Default.(func() time.Time)
+	// teamgroupmemberDescID is the schema descriptor for id field.
+	teamgroupmemberDescID := teamgroupmemberFields[0].Descriptor()
+	// teamgroupmember.DefaultID holds the default value on creation for the id field.
+	teamgroupmember.DefaultID = teamgroupmemberDescID.Default.(func() uuid.UUID)
 	teamgroupmodelFields := schema.TeamGroupModel{}.Fields()
 	_ = teamgroupmodelFields
 	// teamgroupmodelDescCreatedAt is the schema descriptor for created_at field.
 	teamgroupmodelDescCreatedAt := teamgroupmodelFields[3].Descriptor()
 	// teamgroupmodel.DefaultCreatedAt holds the default value on creation for the created_at field.
 	teamgroupmodel.DefaultCreatedAt = teamgroupmodelDescCreatedAt.Default.(func() time.Time)
+	// teamgroupmodelDescID is the schema descriptor for id field.
+	teamgroupmodelDescID := teamgroupmodelFields[0].Descriptor()
+	// teamgroupmodel.DefaultID holds the default value on creation for the id field.
+	teamgroupmodel.DefaultID = teamgroupmodelDescID.Default.(func() uuid.UUID)
 	teamhostFields := schema.TeamHost{}.Fields()
 	_ = teamhostFields
 	// teamhostDescCreatedAt is the schema descriptor for created_at field.
 	teamhostDescCreatedAt := teamhostFields[3].Descriptor()
 	// teamhost.DefaultCreatedAt holds the default value on creation for the created_at field.
 	teamhost.DefaultCreatedAt = teamhostDescCreatedAt.Default.(func() time.Time)
+	// teamhostDescID is the schema descriptor for id field.
+	teamhostDescID := teamhostFields[0].Descriptor()
+	// teamhost.DefaultID holds the default value on creation for the id field.
+	teamhost.DefaultID = teamhostDescID.Default.(func() uuid.UUID)
 	teamimageFields := schema.TeamImage{}.Fields()
 	_ = teamimageFields
 	// teamimageDescCreatedAt is the schema descriptor for created_at field.
 	teamimageDescCreatedAt := teamimageFields[3].Descriptor()
 	// teamimage.DefaultCreatedAt holds the default value on creation for the created_at field.
 	teamimage.DefaultCreatedAt = teamimageDescCreatedAt.Default.(func() time.Time)
+	// teamimageDescID is the schema descriptor for id field.
+	teamimageDescID := teamimageFields[0].Descriptor()
+	// teamimage.DefaultID holds the default value on creation for the id field.
+	teamimage.DefaultID = teamimageDescID.Default.(func() uuid.UUID)
 	teammemberFields := schema.TeamMember{}.Fields()
 	_ = teammemberFields
 	// teammemberDescCreatedAt is the schema descriptor for created_at field.
 	teammemberDescCreatedAt := teammemberFields[4].Descriptor()
 	// teammember.DefaultCreatedAt holds the default value on creation for the created_at field.
 	teammember.DefaultCreatedAt = teammemberDescCreatedAt.Default.(func() time.Time)
+	// teammemberDescID is the schema descriptor for id field.
+	teammemberDescID := teammemberFields[0].Descriptor()
+	// teammember.DefaultID holds the default value on creation for the id field.
+	teammember.DefaultID = teammemberDescID.Default.(func() uuid.UUID)
 	teammodelFields := schema.TeamModel{}.Fields()
 	_ = teammodelFields
 	// teammodelDescCreatedAt is the schema descriptor for created_at field.
 	teammodelDescCreatedAt := teammodelFields[3].Descriptor()
 	// teammodel.DefaultCreatedAt holds the default value on creation for the created_at field.
 	teammodel.DefaultCreatedAt = teammodelDescCreatedAt.Default.(func() time.Time)
+	// teammodelDescID is the schema descriptor for id field.
+	teammodelDescID := teammodelFields[0].Descriptor()
+	// teammodel.DefaultID holds the default value on creation for the id field.
+	teammodel.DefaultID = teammodelDescID.Default.(func() uuid.UUID)
 	teamoidcconfigFields := schema.TeamOIDCConfig{}.Fields()
 	_ = teamoidcconfigFields
 	// teamoidcconfigDescEnabled is the schema descriptor for enabled field.
@@ -1280,6 +1416,10 @@ func init() {
 	teamoidcconfig.DefaultUpdatedAt = teamoidcconfigDescUpdatedAt.Default.(func() time.Time)
 	// teamoidcconfig.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	teamoidcconfig.UpdateDefaultUpdatedAt = teamoidcconfigDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// teamoidcconfigDescID is the schema descriptor for id field.
+	teamoidcconfigDescID := teamoidcconfigFields[0].Descriptor()
+	// teamoidcconfig.DefaultID holds the default value on creation for the id field.
+	teamoidcconfig.DefaultID = teamoidcconfigDescID.Default.(func() uuid.UUID)
 	userMixin := schema.User{}.Mixin()
 	userMixinHooks0 := userMixin[0].Hooks()
 	user.Hooks[0] = userMixinHooks0[0]
@@ -1305,6 +1445,10 @@ func init() {
 	user.DefaultUpdatedAt = userDescUpdatedAt.Default.(func() time.Time)
 	// user.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	user.UpdateDefaultUpdatedAt = userDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// userDescID is the schema descriptor for id field.
+	userDescID := userFields[0].Descriptor()
+	// user.DefaultID holds the default value on creation for the id field.
+	user.DefaultID = userDescID.Default.(func() uuid.UUID)
 	useridentityMixin := schema.UserIdentity{}.Mixin()
 	useridentityMixinHooks0 := useridentityMixin[0].Hooks()
 	useridentity.Hooks[0] = useridentityMixinHooks0[0]
@@ -1332,6 +1476,10 @@ func init() {
 	useridentityDescUpdatedAt := useridentityFields[8].Descriptor()
 	// useridentity.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	useridentity.UpdateDefaultUpdatedAt = useridentityDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// useridentityDescID is the schema descriptor for id field.
+	useridentityDescID := useridentityFields[0].Descriptor()
+	// useridentity.DefaultID holds the default value on creation for the id field.
+	useridentity.DefaultID = useridentityDescID.Default.(func() uuid.UUID)
 	virtualmachineMixin := schema.VirtualMachine{}.Mixin()
 	virtualmachineMixinHooks0 := virtualmachineMixin[0].Hooks()
 	virtualmachine.Hooks[0] = virtualmachineMixinHooks0[0]
@@ -1357,9 +1505,12 @@ func init() {
 	virtualmachinerecyclerecordDescCreatedAt := virtualmachinerecyclerecordFields[9].Descriptor()
 	// virtualmachinerecyclerecord.DefaultCreatedAt holds the default value on creation for the created_at field.
 	virtualmachinerecyclerecord.DefaultCreatedAt = virtualmachinerecyclerecordDescCreatedAt.Default.(func() time.Time)
+	// virtualmachinerecyclerecordDescID is the schema descriptor for id field.
+	virtualmachinerecyclerecordDescID := virtualmachinerecyclerecordFields[0].Descriptor()
+	// virtualmachinerecyclerecord.DefaultID holds the default value on creation for the id field.
+	virtualmachinerecyclerecord.DefaultID = virtualmachinerecyclerecordDescID.Default.(func() uuid.UUID)
 }
 
 const (
-	Version = "v0.14.5"                                         // Version of ent codegen.
-	Sum     = "h1:Rj2WOYJtCkWyFo6a+5wB3EfBRP0rnx1fMk6gGA0UUe4=" // Sum of ent codegen.
+	Version = "v0.14.5" // Version of ent codegen.
 )

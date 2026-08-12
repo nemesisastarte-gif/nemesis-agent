@@ -34,7 +34,7 @@ func (NotifySubscription) Mixin() []ent.Mixin {
 
 func (NotifySubscription) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("channel_id", uuid.UUID{}),
 		field.String("scope").Default("self"),
 		field.JSON("event_types", []consts.NotifyEventType{}),

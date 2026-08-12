@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachinerecyclerecord"
-	"github.com/google/uuid"
 )
 
 // VirtualMachineRecycleRecordCreate is the builder for creating a VirtualMachineRecycleRecord entity.
@@ -109,6 +109,14 @@ func (_c *VirtualMachineRecycleRecordCreate) SetID(v uuid.UUID) *VirtualMachineR
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *VirtualMachineRecycleRecordCreate) SetNillableID(v *uuid.UUID) *VirtualMachineRecycleRecordCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // Mutation returns the VirtualMachineRecycleRecordMutation object of the builder.
 func (_c *VirtualMachineRecycleRecordCreate) Mutation() *VirtualMachineRecycleRecordMutation {
 	return _c.mutation
@@ -151,6 +159,10 @@ func (_c *VirtualMachineRecycleRecordCreate) defaults() {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := virtualmachinerecyclerecord.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := virtualmachinerecyclerecord.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

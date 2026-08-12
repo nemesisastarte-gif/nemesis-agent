@@ -9,10 +9,10 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/gitbot"
 	"github.com/teteekoue/NemesisCode/backend/db/gitbottask"
 	"github.com/teteekoue/NemesisCode/backend/db/task"
-	"github.com/google/uuid"
 )
 
 // GitBotTask is the model entity for the GitBotTask schema.

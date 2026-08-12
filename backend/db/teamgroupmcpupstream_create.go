@@ -12,11 +12,11 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/mcpupstream"
 	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroup"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroupmcpupstream"
-	"github.com/google/uuid"
 )
 
 // TeamGroupMCPUpstreamCreate is the builder for creating a TeamGroupMCPUpstream entity.
@@ -79,6 +79,14 @@ func (_c *TeamGroupMCPUpstreamCreate) SetID(v uuid.UUID) *TeamGroupMCPUpstreamCr
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *TeamGroupMCPUpstreamCreate) SetNillableID(v *uuid.UUID) *TeamGroupMCPUpstreamCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetTeam sets the "team" edge to the Team entity.
 func (_c *TeamGroupMCPUpstreamCreate) SetTeam(v *Team) *TeamGroupMCPUpstreamCreate {
 	return _c.SetTeamID(v.ID)
@@ -136,6 +144,10 @@ func (_c *TeamGroupMCPUpstreamCreate) defaults() {
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		v := teamgroupmcpupstream.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := teamgroupmcpupstream.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

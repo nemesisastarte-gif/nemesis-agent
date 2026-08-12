@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/agentskill"
 	"github.com/teteekoue/NemesisCode/backend/db/agentskillgroupbinding"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroup"
-	"github.com/google/uuid"
 )
 
 // AgentSkillGroupBindingCreate is the builder for creating a AgentSkillGroupBinding entity.

@@ -148,6 +148,14 @@ const cn = {
   },
   login: {
     title: "NemesisCode 智能开发平台",
+    simple: {
+      username: "用户名",
+      password: "密码",
+      signIn: "登 录",
+      hint: "本地实例 — 默认账号：Admin / Admin",
+      welcome: "欢迎回来",
+      failed: "用户名或密码错误",
+    },
     tabs: {
       user: "普通用户",
       manager: "团队管理员",

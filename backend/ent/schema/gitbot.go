@@ -34,7 +34,7 @@ func (GitBot) Mixin() []ent.Mixin {
 
 func (GitBot) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}),
+		field.UUID("id", uuid.UUID{}).Default(uuid.New),
 		field.UUID("user_id", uuid.UUID{}),
 		field.String("name").Optional(),
 		field.String("host_id"),

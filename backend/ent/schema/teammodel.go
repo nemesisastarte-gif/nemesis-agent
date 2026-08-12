@@ -25,7 +25,7 @@ func (TeamModel) Annotations() []schema.Annotation {
 // Fields of the TeamModel.
 func (TeamModel) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}),
+		field.UUID("id", uuid.UUID{}).Default(uuid.New),
 		field.UUID("team_id", uuid.UUID{}),
 		field.UUID("model_id", uuid.UUID{}),
 		field.Time("created_at").Default(time.Now),

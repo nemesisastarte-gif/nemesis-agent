@@ -25,7 +25,7 @@ func (TeamHost) Annotations() []schema.Annotation {
 // Fields of the TeamHost.
 func (TeamHost) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("team_id", uuid.UUID{}),
 		field.String("host_id"),
 		field.Time("created_at").Default(time.Now),

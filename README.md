@@ -106,7 +106,7 @@ scripts/nemesis-local.sh start
 ```
 
 Ouvrez <http://localhost:5173> et connectez-vous avec
-`admin@nemesis.local` / `nemesis123` (modifiable via
+`Admin` / `Admin` (modifiable via
 `MCAI_INIT_TEAM_EMAIL` / `MCAI_INIT_TEAM_PASSWORD`). Arrêt :
 `scripts/nemesis-local.sh stop`. Installation détaillée (Termux/Linux) :
 [docs/local-setup.md](./docs/local-setup.md).
@@ -119,8 +119,8 @@ cd backend
 export MCAI_TASKFLOW_MODE=local
 export MCAI_DATABASE_DRIVER=sqlite      # ou postgres + MCAI_DATABASE_MASTER
 export MCAI_REDIS_HOST=                 # vide → Redis en mémoire intégré
-export MCAI_INIT_TEAM_EMAIL=admin@nemesis.local
-export MCAI_INIT_TEAM_PASSWORD=nemesis123
+export MCAI_INIT_TEAM_EMAIL=Admin
+export MCAI_INIT_TEAM_PASSWORD=Admin
 export MCAI_INIT_TEAM_IMAGE=local-env
 export MCAI_SECURITY_CAPTCHA_ENABLED=false
 go run ./cmd/server                     # écoute sur :8888

@@ -11,6 +11,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/agentplugin"
 	"github.com/teteekoue/NemesisCode/backend/db/agentpluginrepo"
@@ -69,7 +70,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachine"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachinerecyclerecord"
 	"github.com/teteekoue/NemesisCode/backend/ent/types"
-	"github.com/google/uuid"
 )
 
 const (

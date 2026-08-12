@@ -34,7 +34,7 @@ func (TeamGroup) Mixin() []ent.Mixin {
 // Fields of the TeamGroup.
 func (TeamGroup) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("team_id", uuid.UUID{}),
 		field.String("name"),
 		field.Time("created_at").Default(time.Now),

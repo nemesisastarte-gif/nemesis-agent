@@ -32,7 +32,7 @@ func (MCPUpstream) Mixin() []ent.Mixin {
 
 func (MCPUpstream) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.String("name").NotEmpty().MaxLen(128),
 		field.String("slug").NotEmpty().MaxLen(64),
 		field.Enum("scope").Values("user", "platform", "team"),

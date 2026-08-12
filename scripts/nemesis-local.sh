@@ -27,8 +27,8 @@ default_env() {
   export MCAI_TASKFLOW_MODE="${MCAI_TASKFLOW_MODE:-local}"
   export MCAI_DATABASE_DRIVER="${MCAI_DATABASE_DRIVER:-sqlite}"
   export MCAI_REDIS_HOST="${MCAI_REDIS_HOST:-}"          # vide → Redis en mémoire intégré
-  export MCAI_INIT_TEAM_EMAIL="${MCAI_INIT_TEAM_EMAIL:-admin@nemesis.local}"
-  export MCAI_INIT_TEAM_PASSWORD="${MCAI_INIT_TEAM_PASSWORD:-nemesis123}"
+  export MCAI_INIT_TEAM_EMAIL="${MCAI_INIT_TEAM_EMAIL:-Admin}"
+  export MCAI_INIT_TEAM_PASSWORD="${MCAI_INIT_TEAM_PASSWORD:-Admin}"
   export MCAI_INIT_TEAM_NAME="${MCAI_INIT_TEAM_NAME:-NemesisCode Admin}"
   export MCAI_INIT_TEAM_IMAGE="${MCAI_INIT_TEAM_IMAGE:-local-env}"
   export MCAI_SECURITY_CAPTCHA_ENABLED="${MCAI_SECURITY_CAPTCHA_ENABLED:-false}"
@@ -84,7 +84,7 @@ cmd_start() {
   echo "✅ NemesisCode est prêt :"
   echo "   Frontend : http://localhost:$FRONTEND_PORT"
   echo "   Backend  : http://localhost:$BACKEND_PORT"
-  echo "   Compte initial : ${MCAI_INIT_TEAM_EMAIL} / ${MCAI_INIT_TEAM_PASSWORD}"
+  echo "   Connexion : identifiant ${MCAI_INIT_TEAM_EMAIL} / mot de passe ${MCAI_INIT_TEAM_PASSWORD}"
   echo "   Espaces de travail : ~/.nemesiscode/workspaces"
   echo "   Logs : $RUNTIME_DIR"
   echo

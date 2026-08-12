@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/gitbottask"
 	"github.com/teteekoue/NemesisCode/backend/db/gittask"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
@@ -22,7 +23,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/taskvirtualmachine"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachine"
-	"github.com/google/uuid"
 )
 
 // TaskQuery is the builder for querying Task entities.

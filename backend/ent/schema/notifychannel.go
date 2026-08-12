@@ -35,7 +35,7 @@ func (NotifyChannel) Mixin() []ent.Mixin {
 
 func (NotifyChannel) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("owner_id", uuid.UUID{}),
 		field.String("owner_type").GoType(consts.NotifyOwnerType("")).Default(string(consts.NotifyOwnerUser)),
 		field.String("name").NotEmpty().MaxLen(64),

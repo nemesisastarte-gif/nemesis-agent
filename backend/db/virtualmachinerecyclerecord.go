@@ -10,9 +10,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/virtualmachinerecyclerecord"
-	"github.com/google/uuid"
 )
 
 // VirtualMachineRecycleRecord is the model entity for the VirtualMachineRecycleRecord schema.

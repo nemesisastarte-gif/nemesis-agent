@@ -148,6 +148,14 @@ const en = {
   },
   login: {
     title: "NemesisCode AI Platform",
+    simple: {
+      username: "Username",
+      password: "Password",
+      signIn: "Sign in",
+      hint: "Local instance — default credentials: Admin / Admin",
+      welcome: "Welcome back",
+      failed: "Invalid username or password",
+    },
     tabs: {
       user: "User",
       manager: "Admin",

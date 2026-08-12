@@ -27,7 +27,7 @@ func (ProjectTask) Annotations() []schema.Annotation {
 // Fields of the ProjectTask.
 func (ProjectTask) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}),
+		field.UUID("id", uuid.UUID{}).Default(uuid.New),
 		field.UUID("task_id", uuid.UUID{}),
 		field.UUID("model_id", uuid.UUID{}),
 		field.UUID("image_id", uuid.UUID{}),

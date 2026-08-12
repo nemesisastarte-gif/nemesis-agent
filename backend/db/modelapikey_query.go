@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
 	"github.com/teteekoue/NemesisCode/backend/db/modelapikey"
 	"github.com/teteekoue/NemesisCode/backend/db/predicate"
-	"github.com/google/uuid"
 )
 
 // ModelApiKeyQuery is the builder for querying ModelApiKey entities.

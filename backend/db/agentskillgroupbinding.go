@@ -9,10 +9,10 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/agentskill"
 	"github.com/teteekoue/NemesisCode/backend/db/agentskillgroupbinding"
 	"github.com/teteekoue/NemesisCode/backend/db/teamgroup"
-	"github.com/google/uuid"
 )
 
 // AgentSkillGroupBinding is the model entity for the AgentSkillGroupBinding schema.

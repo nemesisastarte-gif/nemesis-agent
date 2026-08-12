@@ -27,7 +27,7 @@ func (TeamMember) Annotations() []schema.Annotation {
 // Fields of the TeamMember.
 func (TeamMember) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("team_id", uuid.UUID{}),
 		field.UUID("user_id", uuid.UUID{}),
 		field.String("role").GoType(consts.TeamMemberRole("")),

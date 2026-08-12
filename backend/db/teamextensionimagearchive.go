@@ -9,10 +9,10 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/image"
 	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/teteekoue/NemesisCode/backend/db/teamextensionimagearchive"
-	"github.com/google/uuid"
 )
 
 // TeamExtensionImageArchive is the model entity for the TeamExtensionImageArchive schema.

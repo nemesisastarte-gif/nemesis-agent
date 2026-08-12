@@ -34,7 +34,7 @@ func (UserIdentity) Mixin() []ent.Mixin {
 // Fields of the UserIdentity.
 func (UserIdentity) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("user_id", uuid.UUID{}),
 		field.String("platform").GoType(consts.UserPlatform("")).NotEmpty(),
 		field.String("identity_id").NotEmpty(),

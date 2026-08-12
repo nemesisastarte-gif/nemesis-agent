@@ -9,8 +9,8 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/teteekoue/NemesisCode/backend/db/team"
 	"github.com/google/uuid"
+	"github.com/teteekoue/NemesisCode/backend/db/team"
 )
 
 // Team is the model entity for the Team schema.

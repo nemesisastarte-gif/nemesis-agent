@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db/gitidentity"
 	"github.com/teteekoue/NemesisCode/backend/db/image"
@@ -20,7 +21,6 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/projectissue"
 	"github.com/teteekoue/NemesisCode/backend/db/projecttask"
 	"github.com/teteekoue/NemesisCode/backend/db/task"
-	"github.com/google/uuid"
 )
 
 // ProjectTaskCreate is the builder for creating a ProjectTask entity.
@@ -159,6 +159,14 @@ func (_c *ProjectTaskCreate) SetID(v uuid.UUID) *ProjectTaskCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *ProjectTaskCreate) SetNillableID(v *uuid.UUID) *ProjectTaskCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetTask sets the "task" edge to the Task entity.
 func (_c *ProjectTaskCreate) SetTask(v *Task) *ProjectTaskCreate {
 	return _c.SetTaskID(v.ID)
@@ -227,6 +235,10 @@ func (_c *ProjectTaskCreate) defaults() {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := projecttask.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		v := projecttask.DefaultID()
+		_c.mutation.SetID(v)
 	}
 }
 

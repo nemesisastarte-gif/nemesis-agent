@@ -25,7 +25,7 @@ func (TaskVirtualMachine) Annotations() []schema.Annotation {
 // Fields of the TaskVirtualMachine.
 func (TaskVirtualMachine) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}),
+		field.UUID("id", uuid.UUID{}).Default(uuid.New),
 		field.UUID("task_id", uuid.UUID{}),
 		field.String("virtualmachine_id"),
 		field.Time("created_at").Default(time.Now),

@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/teteekoue/NemesisCode/backend/db/model"
 	"github.com/teteekoue/NemesisCode/backend/db/modelapikey"
-	"github.com/google/uuid"
 )
 
 // ModelApiKeyCreate is the builder for creating a ModelApiKey entity.
@@ -127,6 +127,14 @@ func (_c *ModelApiKeyCreate) SetID(v uuid.UUID) *ModelApiKeyCreate {
 	return _c
 }
 
+// SetNillableID sets the "id" field if the given value is not nil.
+func (_c *ModelApiKeyCreate) SetNillableID(v *uuid.UUID) *ModelApiKeyCreate {
+	if v != nil {
+		_c.SetID(*v)
+	}
+	return _c
+}
+
 // SetModel sets the "model" edge to the Model entity.
 func (_c *ModelApiKeyCreate) SetModel(v *Model) *ModelApiKeyCreate {
 	return _c.SetModelID(v.ID)
@@ -183,6 +191,13 @@ func (_c *ModelApiKeyCreate) defaults() error {
 		}
 		v := modelapikey.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.ID(); !ok {
+		if modelapikey.DefaultID == nil {
+			return fmt.Errorf("db: uninitialized modelapikey.DefaultID (forgotten import db/runtime?)")
+		}
+		v := modelapikey.DefaultID()
+		_c.mutation.SetID(v)
 	}
 	return nil
 }

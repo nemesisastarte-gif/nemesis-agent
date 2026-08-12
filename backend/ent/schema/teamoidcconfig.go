@@ -25,7 +25,7 @@ func (TeamOIDCConfig) Annotations() []schema.Annotation {
 
 func (TeamOIDCConfig) Fields() []ent.Field {
 	return []ent.Field{
-		field.UUID("id", uuid.UUID{}).Unique(),
+		field.UUID("id", uuid.UUID{}).Unique().Default(uuid.New),
 		field.UUID("team_id", uuid.UUID{}),
 		field.Bool("enabled").Default(false),
 		field.String("display_name").Default("企业登录"),
