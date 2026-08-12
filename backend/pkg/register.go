@@ -33,6 +33,7 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/pkg/store"
 	"github.com/teteekoue/NemesisCode/backend/pkg/tasker"
 	"github.com/teteekoue/NemesisCode/backend/pkg/taskflow"
+	"github.com/teteekoue/NemesisCode/backend/pkg/taskflow/local"
 	"github.com/teteekoue/NemesisCode/backend/pkg/tasklog"
 	"github.com/teteekoue/NemesisCode/backend/pkg/telemetry"
 	"github.com/teteekoue/NemesisCode/backend/pkg/vmrecycle"
@@ -111,6 +112,11 @@ func RegisterInfra(i *do.Injector, w ...*web.Web) error {
 	do.Provide(i, func(i *do.Injector) (taskflow.Clienter, error) {
 		cfg := do.MustInvoke[*config.Config](i)
 		l := do.MustInvoke[*slog.Logger](i)
+		// Mode local : la machine hôte est l'environnement de développement.
+		// Aucun service taskflow/rustfs requis (voir docs/local-mode-design.md).
+		if cfg.TaskFlow.Mode == "local" {
+			return local.NewClient(cfg.TaskFlow.Local, l)
+		}
 		return taskflow.NewClient(taskflow.WithDebug(cfg.Debug), taskflow.WithLogger(l)), nil
 	})
 

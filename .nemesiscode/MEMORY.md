@@ -43,3 +43,15 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - UI 验收需等待 `document.fonts.ready`，确认 JetBrains Mono Variable 与 Noto Sans SC Variable 已加载，并检查浏览器控制台和 Network 中没有字体资源失败。
   - 在 320px、375px、390px、430px 和 1280px 对照基准页面核对字体族、字号、字重和行高，字体变化应作为构建后高频回归项记录和处理。
   - Vite 日志出现 `Must set target or forward` 表示 `/api` proxy 缺少 `TARGET`，应使用显式目标重启预览。
+
+[Mode local backend (machine hôte = environnement de dev)]
+- Date: 2026-08-12
+- Context: Rebranding NemesisCode + passage en usage local (hors cloud)
+- Category: 环境配置|排错调试
+- Instructions:
+  - Le backend consomme taskflow uniquement via l'interface `taskflow.Clienter` (backend/pkg/taskflow/client.go) — le mode local (`MCAI_TASKFLOW_MODE=local`) branche `pkg/taskflow/local` qui exécute l'agent directement sur la machine hôte (workspace = ~/.nemesiscode/workspaces/<vm_id>, agent = $MCAI_TASKFLOW_LOCAL_AGENT_BIN --task-config <ws>/nemesis-task.json).
+  - `PrepareCreate` exige une ligne host en base : en mode local `pkg/localhost.EnsureHost` (appelé dans cmd/server/main.go) upsert l'hôte `local-<hostname>` au nom de l'init-team user (MCAI_INIT_TEAM_EMAIL) — sans admin, l'hôte n'est visible que du premier user.
+  - ClickHouse/Loki non configurés (addr vide) sont déjà no-op (tasklog providers et modelusage.Recorder gèrent nil) — pas besoin de les lancer en local.
+  - Contrat agent v1 : processus sur stdout émet soit des octets bruts (→ chunk output), soit des lignes JSON {"event","kind","data","seq"} (→ chunks structurés) ; `task-ended` = fin de processus.
+  - Limites v1 documentées dans docs/local-mode-design.md : terminal sans PTY (resize ignoré), buffer TaskLive en mémoire, AutoApprove/AskUserQuestion journalisés seulement, protocole réel ohmyagent à aligner (étape 4).
+  - Vérifier le Go avec le parseur tree-sitter (npm: web-tree-sitter + tree-sitter-go.wasm) car le sandbox n'a pas de toolchain Go (go.dev/dl.google.com bloqués).

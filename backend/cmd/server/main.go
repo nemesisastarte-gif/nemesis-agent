@@ -12,7 +12,9 @@ import (
 
 	"github.com/teteekoue/NemesisCode/backend/biz"
 	"github.com/teteekoue/NemesisCode/backend/config"
+	"github.com/teteekoue/NemesisCode/backend/db"
 	"github.com/teteekoue/NemesisCode/backend/pkg"
+	"github.com/teteekoue/NemesisCode/backend/pkg/localhost"
 	"github.com/teteekoue/NemesisCode/backend/pkg/service"
 	"github.com/teteekoue/NemesisCode/backend/pkg/store"
 	"github.com/teteekoue/NemesisCode/backend/pkg/telemetry"
@@ -65,6 +67,13 @@ func main() {
 	biz.RegisterOpenSource(injector)
 	biz.InvokeAll(injector)
 	biz.InvokeOpenSource(injector)
+
+	// Mode local (MCAI_TASKFLOW_MODE=local) : la machine hôte est
+	// l'environnement de développement — on l'enregistre comme hôte en base,
+	// sinon la création de tâche échoue (PrepareCreate requiert host.ID).
+	if err := localhost.EnsureHost(context.Background(), cfg, do.MustInvoke[*db.Client](injector), l); err != nil {
+		l.Warn("failed to register local host (task creation will fail until a host exists)", "error", err)
+	}
 
 	// 获取 web 实例并启动服务
 	w.PrintRoutes()

@@ -178,6 +178,28 @@ type TaskFlow struct {
 	GrpcHost string `mapstructure:"grpc_host"`
 	GrpcPort int    `mapstructure:"grpc_port"`
 	GrpcURL  string `mapstructure:"grpc_url"`
+	// Mode 选择 taskflow 客户端实现："remote"（默认，调用远端 taskflow 服务）
+	// 或 "local"（本机执行：机器 hôte = environnement de dev，无 taskflow/rustfs）。
+	Mode  string        `mapstructure:"mode"`
+	Local LocalTaskFlow `mapstructure:"local"`
+}
+
+// LocalTaskFlow 配置 mode=local 时的本机执行参数。
+type LocalTaskFlow struct {
+	// WorkspaceRoot 工作区根目录，每个任务一个子目录。空 = ~/.nemesiscode/workspaces
+	WorkspaceRoot string `mapstructure:"workspace_root"`
+	// AgentBin 本机 agent 引擎可执行文件（默认 "ohmyagent"，从 PATH 查找）。
+	AgentBin string `mapstructure:"agent_bin"`
+	// AgentArgs 追加给引擎的参数（默认 --task-config <workspace>/nemesis-task.json）。
+	AgentArgs []string `mapstructure:"agent_args"`
+	// Shell 终端 shell（默认 $SHELL，兜底 /bin/sh）。
+	Shell string `mapstructure:"shell"`
+	// HostID 本机在宿主列表中的 ID（默认 local-<hostname>）。
+	HostID string `mapstructure:"host_id"`
+	// HostName 宿主机显示名（默认主机名）。
+	HostName string `mapstructure:"host_name"`
+	// KeepWorkspaceOnDelete 删除任务时保留工作区目录（默认 false：删除）。
+	KeepWorkspaceOnDelete bool `mapstructure:"keep_workspace_on_delete"`
 }
 
 type MCPHub struct {
@@ -379,6 +401,14 @@ func Init(dir string) (*Config, error) {
 	v.SetDefault("init_team.image", "")
 	v.SetDefault("init_team.extension_package_dir", "/app/extensions/packages")
 	v.SetDefault("taskflow.grpc_url", "")
+	v.SetDefault("taskflow.mode", "remote")
+	v.SetDefault("taskflow.local.workspace_root", "")
+	v.SetDefault("taskflow.local.agent_bin", "ohmyagent")
+	v.SetDefault("taskflow.local.agent_args", []string{})
+	v.SetDefault("taskflow.local.shell", "")
+	v.SetDefault("taskflow.local.host_id", "")
+	v.SetDefault("taskflow.local.host_name", "")
+	v.SetDefault("taskflow.local.keep_workspace_on_delete", false)
 	v.SetDefault("task.at_keyword", "")
 	v.SetDefault("task.host_ids", []string{})
 	v.SetDefault("task.create_req_ttl_seconds", 600)

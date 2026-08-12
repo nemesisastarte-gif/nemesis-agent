@@ -65,6 +65,27 @@ You do not need to assemble tools, set up environments, or jump between workflow
 - **Fully open source**: The core code is public on GitHub. Anyone can audit, fork, and extend it while keeping control over technical choices and security policies.
 - **Private offline deployment**: Enterprises and teams with strict data privacy requirements can deploy NemesisCode inside their own networks and keep data local.
 
+## Local Mode (machine hôte = environnement de dev)
+
+NemesisCode peut fonctionner **sans aucune infrastructure cloud** : quand le
+backend démarre en mode local, la machine qui l'héberge devient
+l'environnement de développement de l'agent. Pas de taskflow, pas de VM
+conteneur, pas de rustfs — l'agent (moteur `ohmyagent`) tourne directement sur
+l'hôte dans `~/.nemesiscode/workspaces/<task>`.
+
+```bash
+# Backend en mode local (Postgres + Redis requis localement)
+MCAI_TASKFLOW_MODE=local \
+MCAI_DATABASE_MASTER="postgres://user:pass@127.0.0.1:5432/nemesiscode?sslmode=disable" \
+MCAI_REDIS_HOST=127.0.0.1 \
+MCAI_INIT_TEAM_EMAIL=admin@local MCAI_INIT_TEAM_PASSWORD=change-me \
+go run ./cmd/server
+```
+
+Variables utiles : `MCAI_TASKFLOW_LOCAL_WORKSPACE_ROOT`,
+`MCAI_TASKFLOW_LOCAL_AGENT_BIN`, `MCAI_TASKFLOW_LOCAL_SHELL`,
+`MCAI_TASKFLOW_LOCAL_HOST_ID`. Design complet : [docs/local-mode-design.md](./docs/local-mode-design.md).
+
 ## Usage
 
 ### Online
