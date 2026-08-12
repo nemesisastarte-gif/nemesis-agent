@@ -129,10 +129,17 @@ démarrage (`pkg/localhost.EnsureHost`, appelé depuis `cmd/server/main.go`) :
    (docker-compose `db`/`redis` ou installs natives) et **sans**
    taskflow / rustfs / ingress / clickhouse / loki (ces derniers sont déjà
    no-op quand leur adresse est vide).
-2. **Étape 2** : rendre Postgres optionnel (SQLite via ent) et Redis
-   optionnel (fallback mémoire) pour une machine nue type Termux sans Docker.
-3. **Étape 3** : scripts de lancement one-shot (`nemesis-local up`) + doc
-   d'installation Termux/Linux + frontend buildé servi par le backend.
+2. **✅ Étape 2 (faite)** : Postgres optionnel (`MCAI_DATABASE_DRIVER=sqlite`,
+   fichier `~/.nemesiscode/nemesiscode.db`, auto-migration ent — les fichiers
+   `migration/*.sql` restent en dialecte Postgres) et Redis optionnel
+   (host vide → serveur Redis en mémoire `miniredis` intégré au processus,
+   sessions/tasker/notifications inclus). **Stockage objet local**
+   (`MCAI_OBJECT_STORAGE_PROVIDER=local`) : avatars, pièces jointes et
+   presigns servis depuis le disque (`~/.nemesiscode/uploads`) via
+   `/api/v1/assets` et la route PUT `/api/v1/uploader/direct` — aucun
+   rustfs/S3 requis.
+3. **✅ Étape 3 (faite)** : `scripts/nemesis-local.sh` (start/stop/status/logs)
+   + `docs/local-setup.md` (installation Termux/Linux).
 4. **Étape 4** : aligner le contrat agent sur le vrai moteur `ohmyagent`
    (protocole frame JSON-RPC) et brancher les vrais événements
    (`task-event`, permissions, questions).

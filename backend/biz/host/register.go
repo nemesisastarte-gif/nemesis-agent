@@ -11,7 +11,9 @@ import (
 // ProvideHost 注册 host 模块的服务工厂
 func ProvideHost(i *do.Injector) {
 	do.Provide(i, repo.NewHostRepo)
+	do.Provide(i, repo.NewPublicHostRepo)
 	do.Provide(i, usecase.NewHostUsecase)
+	do.Provide(i, usecase.NewPublicHostUsecase)
 	do.Provide(i, v1.NewHostHandler)
 	do.Provide(i, v1.NewInternalHostHandler)
 }

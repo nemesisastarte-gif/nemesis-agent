@@ -1,7 +1,11 @@
 package team
 
 import (
+	"fmt"
+
 	"github.com/samber/do"
+
+	"github.com/teteekoue/NemesisCode/backend/domain"
 
 	v1 "github.com/teteekoue/NemesisCode/backend/biz/team/handler/http/v1"
 	"github.com/teteekoue/NemesisCode/backend/biz/team/repo"
@@ -14,6 +18,15 @@ func ProvideTeam(i *do.Injector) {
 	do.Provide(i, repo.NewAuditRepo)
 	do.Provide(i, repo.NewTeamDashboardRepo)
 	do.Provide(i, usecase.NewTeamGroupUserUsecase)
+	// MemberManager : implémentation restaurée (mode serveur autonome).
+	do.Provide(i, func(i *do.Injector) (domain.MemberManager, error) {
+		uc := do.MustInvoke[domain.TeamGroupUserUsecase](i)
+		mm, ok := uc.(domain.MemberManager)
+		if !ok {
+			return nil, fmt.Errorf("TeamGroupUserUsecase does not implement MemberManager")
+		}
+		return mm, nil
+	})
 	do.Provide(i, usecase.NewAuditUsecase)
 	do.Provide(i, usecase.NewTeamDashboardUsecase)
 	do.Provide(i, v1.NewAuditHandler)

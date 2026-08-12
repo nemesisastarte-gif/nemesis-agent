@@ -3,7 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getCheckinStatus, getSubscription, getWallet, listInvitations, resolveAssetUrl, sendBindEmailVerification, submitCheckin } from '@/api/client';
+import { getBaseUrl, getCheckinStatus, getSubscription, getWallet, listInvitations, resolveAssetUrl, sendBindEmailVerification, submitCheckin } from '@/api/client';
 import { checkAppUpdate, checkOta, currentOtaId, downloadAndApplyOta, installedAppVersion } from '@/updates/useOtaUpdate';
 import { obtainCaptchaToken } from '@/api/captcha';
 import type { InvitationItem, Subscription, Wallet } from '@/api/types';
@@ -57,8 +57,8 @@ function Appearance({ t }: { t: Theme }) {
 
 // 产品相关入口（开源、AI 编程助手 NemesisCode）
 const ABOUT_LINKS: { icon: string; label: string; sub: string; url: string }[] = [
-  { icon: 'globe', label: '官方网站', sub: 'monkeycode-ai.com', url: 'https://monkeycode-ai.com' },
-  { icon: 'file', label: '帮助文档', sub: 'monkeycode.docs.baizhi.cloud', url: 'https://monkeycode.docs.baizhi.cloud/' },
+  { icon: 'server', label: '服务器地址', sub: getBaseUrl(), url: getBaseUrl() },
+  { icon: 'file', label: '帮助文档', sub: 'github.com/teteekoue/NemesisCode', url: 'https://github.com/teteekoue/NemesisCode' },
   { icon: 'github', label: 'GitHub 开源仓库', sub: 'teteekoue/NemesisCode', url: 'https://github.com/teteekoue/NemesisCode' },
 ];
 

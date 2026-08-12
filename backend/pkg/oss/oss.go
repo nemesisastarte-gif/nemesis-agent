@@ -37,6 +37,8 @@ type Client struct {
 	s3        *s3.Client
 	presigner *s3.PresignClient
 	pathStyle bool
+	// local : stockage fichier (mode local, provider="local").
+	local *LocalStore
 }
 
 type Presign struct {
@@ -45,6 +47,9 @@ type Presign struct {
 }
 
 func NewS3Compatible(ctx context.Context, cfg config.ObjectStorageConfig, opt S3Option) (*Client, error) {
+	if cfg.Provider == "local" {
+		return NewLocal(cfg)
+	}
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
 	}
@@ -151,6 +156,9 @@ func (c *Client) initPublicReadPolicy(ctx context.Context) error {
 }
 
 func (c *Client) PutFile(ctx context.Context, prefix, filename string, r io.Reader) error {
+	if c.local != nil {
+		return c.local.Put(ctx, objectKey(prefix, filename), r)
+	}
 	_, err := c.s3.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(c.cfg.Bucket),
 		Key:    aws.String(objectKey(prefix, filename)),
@@ -160,6 +168,9 @@ func (c *Client) PutFile(ctx context.Context, prefix, filename string, r io.Read
 }
 
 func (c *Client) HeadFile(ctx context.Context, prefix, filename string) (bool, error) {
+	if c.local != nil {
+		return c.local.Head(ctx, objectKey(prefix, filename))
+	}
 	_, err := c.s3.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(c.cfg.Bucket),
 		Key:    aws.String(objectKey(prefix, filename)),
@@ -181,6 +192,9 @@ func (c *Client) HeadFile(ctx context.Context, prefix, filename string) (bool, e
 // and no implicit prefix is added.
 // Caller must close the returned io.ReadCloser.
 func (c *Client) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
+	if c.local != nil {
+		return c.local.Get(ctx, key)
+	}
 	out, err := c.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(c.cfg.Bucket),
 		Key:    aws.String(key),
@@ -208,6 +222,10 @@ func (c *Client) WithAccessEndpoint(endpoint string) *Client {
 }
 
 func (c *Client) GetURL(prefix, filename string) string {
+	if c.local != nil {
+		// Route locale de lecture : /api/v1/assets?key=...
+		return assetURLForKey(objectKey(prefix, filename))
+	}
 	base := objectAccessBase(c.cfg)
 	return appendURLPath(base, objectKey(prefix, filename))
 }
@@ -219,6 +237,9 @@ func (c *Client) GetURL(prefix, filename string) string {
 // row (e.g. "agent-resources/skills/global/global/{repoID}/{name}/{ver}.zip").
 func (c *Client) PresignGet(ctx context.Context, key string, expires time.Duration) (string, error) {
 	expires = normalizeExpires(expires)
+	if c.local != nil {
+		return assetURLForKey(key), nil
+	}
 	getURL, err := c.presigner.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(c.cfg.Bucket),
 		Key:    aws.String(key),
@@ -232,6 +253,14 @@ func (c *Client) PresignGet(ctx context.Context, key string, expires time.Durati
 func (c *Client) Presign(ctx context.Context, prefix, filename string, expires time.Duration) (*Presign, error) {
 	expires = normalizeExpires(expires)
 	key := objectKey(prefix, filename)
+	if c.local != nil {
+		// Upload « direct » local : PUT /api/v1/uploader/direct?key=...
+		// (même origine, géré par le backend — voir uploader.go).
+		return &Presign{
+			UploadURL: localDirectUploadPath + "?key=" + url.QueryEscape(key),
+			AccessURL: assetURLForKey(key),
+		}, nil
+	}
 	putURL, err := c.presigner.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(c.cfg.Bucket),
 		Key:    aws.String(key),
@@ -250,6 +279,15 @@ func (c *Client) Presign(ctx context.Context, prefix, filename string, expires t
 		UploadURL: c.publicPresignURL(putURL.URL, key),
 		AccessURL: c.publicPresignURL(getURL.URL, key),
 	}, nil
+}
+
+// localDirectUploadPath est la route PUT locale (voir uploader.go).
+const localDirectUploadPath = "/api/v1/uploader/direct"
+
+// assetURLForKey construit l'URL de lecture locale d'un objet
+// (/api/v1/assets?key=..., servi par le handler Asset).
+func assetURLForKey(key string) string {
+	return "/api/v1/assets?key=" + url.QueryEscape(key)
 }
 
 func objectKey(prefix, filename string) string {

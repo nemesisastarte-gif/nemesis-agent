@@ -34,11 +34,12 @@ func (m *portForwarder) Create(ctx context.Context, req taskflow.CreatePortForwa
 		return nil, fmt.Errorf("environment not found: %s", req.ID)
 	}
 	forwardID := fmt.Sprintf("local-%d", req.LocalPort)
+	accessURL := fmt.Sprintf("http://127.0.0.1:%d", req.LocalPort)
 	info := &taskflow.PortForwardInfo{
 		Port:      req.LocalPort,
 		Status:    "running",
 		ForwardID: &forwardID,
-		AccessURL: fmt.Sprintf("http://127.0.0.1:%d", req.LocalPort),
+		AccessURL: &accessURL,
 		CreatedAt: time.Now().Unix(),
 		Success:   true,
 	}

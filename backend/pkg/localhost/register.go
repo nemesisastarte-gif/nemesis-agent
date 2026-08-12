@@ -6,6 +6,7 @@ package localhost
 import (
 	"context"
 	"fmt"
+	"os"
 	"log/slog"
 	"time"
 
@@ -39,10 +40,7 @@ func EnsureHost(ctx context.Context, cfg *config.Config, dbc *db.Client, l *slog
 
 	hostID := cfg.TaskFlow.Local.HostID
 	if hostID == "" {
-		hostname := cfg.TaskFlow.Local.HostName
-		if hostname == "" {
-			hostname = "local"
-		}
+		hostname, _ := os.Hostname()
 		hostID = "local-" + hostname
 	}
 
@@ -69,10 +67,21 @@ func EnsureHost(ctx context.Context, cfg *config.Config, dbc *db.Client, l *slog
 }
 
 // resolveOwner 查找 host 的属主用户。
+//
+// Avec init-team : on préfère le compte non-enterprise (subaccount) — c'est
+// le compte de connexion web (le user enterprise est exclu du password
+// login). Sans init-team : premier admin, sinon premier user.
 func resolveOwner(ctx context.Context, cfg *config.Config, dbc *db.Client) (uuid.UUID, error) {
 	for i := 0; i < ownerRetryAttempts; i++ {
 		if cfg.InitTeam.Email != "" {
-			u, err := dbc.User.Query().Where(user.EmailEQ(cfg.InitTeam.Email)).First(ctx)
+			u, err := dbc.User.Query().
+				Where(user.EmailEQ(cfg.InitTeam.Email), user.RoleNEQ(consts.UserRoleEnterprise)).
+				Order(user.ByCreatedAt()).
+				First(ctx)
+			if err == nil {
+				return u.ID, nil
+			}
+			u, err = dbc.User.Query().Where(user.EmailEQ(cfg.InitTeam.Email)).Order(user.ByCreatedAt()).First(ctx)
 			if err == nil {
 				return u.ID, nil
 			}

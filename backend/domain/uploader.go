@@ -19,3 +19,8 @@ type PresignResp struct {
 	UploadURL string `json:"upload_url"`
 	AccessURL string `json:"access_url"`
 }
+
+// DirectPutReq requête d'upload local direct (PUT /api/v1/uploader/direct).
+type DirectPutReq struct {
+	Key string `json:"key" query:"key" form:"key" validate:"required"`
+}

@@ -159,3 +159,56 @@ require (
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// GitHub read-only épingle le même tag officiel v1.8.1.
+
+// ---------------------------------------------------------------------------
+// Portabilité : ces hôtes de modules (gopkg.in, golang.org/x, entgo.io,
+// google.golang.org, go.opentelemetry.io, go.uber.org, go.yaml.in, ariga.io,
+// gitlab.com) peuvent être inaccessibles selon les réseaux (CI, entreprises,
+// Termux). On les remplace par leurs dépôts GitHub officiels (même contenu,
+// mêmes versions) — le code est identique, seul le canal de téléchargement
+// change.
+// ---------------------------------------------------------------------------
+replace (
+	ariga.io/atlas => github.com/ariga/atlas v0.32.1-0.20250325101103-175b25e1c1b9
+	entgo.io/ent => github.com/ent/ent v0.14.5
+	gitlab.com/gitlab-org/api/client-go => github.com/smit-modi/gitlab-org-client-go-mirror v1.8.1
+	go.mongodb.org/mongo-driver => github.com/mongodb/mongo-go-driver v1.11.4
+	go.opentelemetry.io/auto/sdk => github.com/open-telemetry/opentelemetry-go-instrumentation/sdk v1.2.1
+	go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho => github.com/open-telemetry/opentelemetry-go-contrib/instrumentation/github.com/labstack/echo/otelecho v0.67.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => github.com/open-telemetry/opentelemetry-go-contrib/instrumentation/net/http/otelhttp v0.63.0
+	go.opentelemetry.io/contrib/propagators/b3 => github.com/open-telemetry/opentelemetry-go-contrib/propagators/b3 v1.42.0
+	go.opentelemetry.io/otel => github.com/open-telemetry/opentelemetry-go v1.42.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace => github.com/open-telemetry/opentelemetry-go/exporters/otlp/otlptrace v1.38.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc => github.com/open-telemetry/opentelemetry-go/exporters/otlp/otlptrace/otlptracegrpc v1.38.0
+	go.opentelemetry.io/otel/metric => github.com/open-telemetry/opentelemetry-go/metric v1.42.0
+	go.opentelemetry.io/otel/sdk => github.com/open-telemetry/opentelemetry-go/sdk v1.42.0
+	go.opentelemetry.io/otel/sdk/metric => github.com/open-telemetry/opentelemetry-go/sdk/metric v1.42.0
+	go.opentelemetry.io/otel/trace => github.com/open-telemetry/opentelemetry-go/trace v1.42.0
+	go.opentelemetry.io/proto/otlp => github.com/open-telemetry/opentelemetry-proto-go/otlp v1.7.1
+	go.uber.org/atomic => github.com/uber-go/atomic v1.11.0
+	go.uber.org/goleak => github.com/uber-go/goleak v1.3.0
+	go.yaml.in/yaml/v3 => github.com/nemesisastarte-gif/nemesis-agent/v3 v3.0.4
+	golang.org/x/crypto => github.com/golang/crypto v0.49.0
+	golang.org/x/mod => github.com/golang/mod v0.33.0
+	golang.org/x/net => github.com/golang/net v0.52.0
+	golang.org/x/oauth2 => github.com/golang/oauth2 v0.36.0
+	golang.org/x/sync => github.com/golang/sync v0.20.0
+	golang.org/x/sys => github.com/golang/sys v0.42.0
+	golang.org/x/telemetry => github.com/golang/telemetry v0.0.0-20260209163413-e7419c687ee4
+	golang.org/x/term => github.com/golang/term v0.41.0
+	golang.org/x/text => github.com/golang/text v0.35.0
+	golang.org/x/time => github.com/golang/time v0.15.0
+	golang.org/x/tools => github.com/golang/tools v0.42.0
+	golang.org/x/xerrors => github.com/golang/xerrors v0.0.0-20191204190536-9bdfabe68543
+	gonum.org/v1/gonum => github.com/gonum/gonum v0.16.0
+	google.golang.org/genproto/googleapis/api => github.com/googleapis/go-genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5
+	google.golang.org/genproto/googleapis/rpc => github.com/googleapis/go-genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5
+	google.golang.org/grpc => github.com/grpc/grpc-go v1.75.1
+	google.golang.org/protobuf => github.com/protocolbuffers/protobuf-go v1.36.10
+	gopkg.in/check.v1 => github.com/go-check/check v0.0.0-20180628173108-788fd7840127
+	gopkg.in/ini.v1 => github.com/go-ini/ini v1.66.2
+	gopkg.in/yaml.v2 => github.com/go-yaml/yaml v0.0.0-20200121171940-53403b58ad1b
+	gopkg.in/yaml.v3 => github.com/go-yaml/yaml v0.0.0-20220527083530-f6f7691b1fde
+)

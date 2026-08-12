@@ -96,26 +96,42 @@ MonkeyCode, elle réunit dans une même interface :
 
 ### Option A — Mode local (recommandé pour un usage personnel)
 
-Prérequis : Go 1.25+, Node 22+, pnpm, PostgreSQL et Redis accessibles
-localement (ou via le docker-compose, voir Option B).
+Prérequis : Go 1.25+, Node 22+, pnpm. **Aucun service externe requis** : base
+SQLite + Redis en mémoire intégrés.
 
 ```bash
-# 1. Backend — mode local
-cd backend
-export MCAI_TASKFLOW_MODE=local
-export MCAI_DATABASE_MASTER="postgres://user:pass@127.0.0.1:5432/nemesiscode?sslmode=disable"
-export MCAI_REDIS_HOST=127.0.0.1
-export MCAI_INIT_TEAM_EMAIL=admin@local
-export MCAI_INIT_TEAM_PASSWORD=change-me
-go run ./cmd/server          # écoute sur :8888
-
-# 2. Frontend — serveur de développement
-cd ../frontend
-pnpm install
-pnpm run dev:offline         # proxy /api vers le backend
+# Tout-en-un : compile le backend, démarre le backend (:8888) et le
+# frontend (:5173) avec SQLite + Redis en mémoire + compte admin local.
+scripts/nemesis-local.sh start
 ```
 
-Ouvrez <http://localhost:5173>, connectez-vous avec le compte init-team, puis :
+Ouvrez <http://localhost:5173> et connectez-vous avec
+`admin@nemesis.local` / `nemesis123` (modifiable via
+`MCAI_INIT_TEAM_EMAIL` / `MCAI_INIT_TEAM_PASSWORD`). Arrêt :
+`scripts/nemesis-local.sh stop`. Installation détaillée (Termux/Linux) :
+[docs/local-setup.md](./docs/local-setup.md).
+
+**Sans le script** :
+
+```bash
+# Backend — mode local
+cd backend
+export MCAI_TASKFLOW_MODE=local
+export MCAI_DATABASE_DRIVER=sqlite      # ou postgres + MCAI_DATABASE_MASTER
+export MCAI_REDIS_HOST=                 # vide → Redis en mémoire intégré
+export MCAI_INIT_TEAM_EMAIL=admin@nemesis.local
+export MCAI_INIT_TEAM_PASSWORD=nemesis123
+export MCAI_INIT_TEAM_IMAGE=local-env
+export MCAI_SECURITY_CAPTCHA_ENABLED=false
+go run ./cmd/server                     # écoute sur :8888
+
+# Frontend — serveur de développement
+cd ../frontend
+pnpm install
+TARGET=http://127.0.0.1:8888 pnpm run dev:offline   # proxy /api vers le backend
+```
+
+Puis :
 
 1. **Settings → AI models** → choisissez un **provider** (NVIDIA NIM,
    Fireworks, Cohere, Custom…) → renseignez l'API token → la liste des modèles

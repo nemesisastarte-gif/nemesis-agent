@@ -67,3 +67,17 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - Nouveaux providers à ajouter : consts/model.go + domain/model.go (liste statique si besoin) + switch GetProviderModelList + (si hors Chine) isOverseasProvider.
   - Les fichiers de composants ne doivent JAMAIS contenir de caractères CJK (tests i18n `assert.doesNotMatch(cjkPattern)`) — commentaires en anglais.
   - Terminal web : page task → panneaux files/terminal/changes/preview ; terminal VM aussi dans settings → VMs → bouton → /console/terminal?envid=. En mode local le terminal = shell sur la machine hôte (workspace de la tâche).
+
+[Étape 2 : SQLite + Redis mémoire + stockage local]
+- Date: 2026-08-12
+- Context: Mode local sans Docker (machine nue/Termux)
+- Category: 环境配置|构建方法
+- Instructions:
+  - `MCAI_DATABASE_DRIVER=sqlite` → base fichier (~/.nemesiscode/nemesiscode.db, défaut via `database.sqlite_path`) ; l'auto-migration ent (Schema.Create + migrate.WithGlobalUniqueID(false)) remplace les fichiers migration/*.sql (dialecte Postgres uniquement) ; pkg/store/entdb.go newEntSQLite, MaxOpenConns=1.
+  - `MCAI_REDIS_HOST` vide → miniredis intégré (pkg/store/redis.go, sync.Once) ; miniredis v2.35 supporte les streams (xadd/xreadgroup/xack) utilisés par tasker/notify.
+  - `MCAI_OBJECT_STORAGE_PROVIDER=local` → pkg/oss/local.go (disque, défaut ~/.nemesiscode/uploads) ; GetURL/PresignGet → /api/v1/assets?key=... ; Presign → PUT /api/v1/uploader/direct?key=... (route ajoutée dans biz/uploader, seulement si provider=local) ; le frontend et mobile résolvent déjà les URLs relatives.
+  - Route /health ajoutée dans cmd/server/main.go (w.Echo().GET) pour le script de lancement.
+  - scripts/nemesis-local.sh : start/stop/status/logs ; env par défaut : sqlite + miniredis + object_storage local + init team admin@nemesis.local/nemesis123 + image local-env + captcha off ; frontend : TARGET=http://127.0.0.1:8888 pnpm dev:offline.
+  - La création de tâche exige une image : init-team avec MCAI_INIT_TEAM_IMAGE crée l'image (ex. local-env) ; le host local est auto-enregistré par pkg/localhost.EnsureHost.
+  - Compiler Go dans le sandbox : bootstrap chain depuis codeload.github.com (go1.4.3 → go1.19.13 → go1.21.13 → go1.23.12 → go1.25.4) car go.dev/dl et proxy.golang.org sont bloqués ; pour les modules Go : GOPROXY=direct (clone via github.com).
+  - Mobile : DEFAULT_BASE_URL = EXPO_PUBLIC_API_URL || http://localhost:8888 ; login placeholder http://<ip-du-serveur>:8888 ; profil « 服务器地址 » = getBaseUrl() ; TOKEN_DOC_URL → repo GitHub.

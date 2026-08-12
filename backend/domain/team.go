@@ -62,6 +62,13 @@ type TeamGroupUserRepo interface {
 	GetMembersByIDs(ctx context.Context, teamID uuid.UUID, userIDs []uuid.UUID) ([]*db.TeamMember, error)
 	GetMember(ctx context.Context, teamID, userID uuid.UUID) (*db.TeamMember, error)
 	InitTeam(ctx context.Context, email, name, password, image string) (*InitTeamResult, error)
+	// Helpers membres (mode serveur autonome — implémentation MemberManager).
+	CreateUsers(ctx context.Context, teamID uuid.UUID, req *AddTeamUserReq) ([]*db.User, error)
+	CreateUsersWithPassword(ctx context.Context, teamID uuid.UUID, req *AddTeamUserWithPasswordReq) ([]*db.User, error)
+	CreateAdmin(ctx context.Context, teamID uuid.UUID, req *AddTeamAdminReq) (*db.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*db.User, error)
+	CreateUser(ctx context.Context, id uuid.UUID, name, email string) (*db.User, error)
+	CreateTeamMember(ctx context.Context, teamID, userID uuid.UUID, role consts.TeamMemberRole) (*db.TeamMember, error)
 }
 
 type InitTeamResult struct {

@@ -867,7 +867,7 @@ export default function LoginScreen() {
           {showServer ? (
             <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderColor: t.line }}>
               <Text style={{ fontSize: 13, color: t.tx2, marginBottom: 8 }}>服务器地址</Text>
-              <TextInput value={serverUrl} onChangeText={setServerUrl} placeholder="https://monkeycode-ai.com" placeholderTextColor={t.tx3}
+              <TextInput value={serverUrl} onChangeText={setServerUrl} placeholder="http://<ip-du-serveur>:8888" placeholderTextColor={t.tx3}
                 autoCapitalize="none" autoCorrect={false} keyboardType="url" editable={!busy && !codeBusy} style={fieldStyle('server')} {...focusProps('server')} />
               <Text style={{ color: t.tx3, fontSize: 11.5, marginTop: 8 }}>私有化 / 离线部署可在此填写你的服务地址。</Text>
 

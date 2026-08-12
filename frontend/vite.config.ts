@@ -137,7 +137,7 @@ export default defineConfig(({ mode, command }) => {
     server: {
       host: "0.0.0.0",
       port: devPort,
-      allowedHosts: ['.monkeycode-ai.online'],
+      allowedHosts: ['.monkeycode-ai.online', '.e2b.app'],
       fs: {
         allow: resolveDevServerFsAllow(
           searchForWorkspaceRoot(__dirname),

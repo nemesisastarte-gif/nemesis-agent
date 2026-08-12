@@ -8,11 +8,15 @@ import (
 	"time"
 
 	"github.com/GoYoko/web"
+	"github.com/GoYoko/web/locale"
+	"github.com/labstack/echo/v4"
 	"github.com/samber/do"
+	"golang.org/x/text/language"
 
 	"github.com/teteekoue/NemesisCode/backend/biz"
 	"github.com/teteekoue/NemesisCode/backend/config"
 	"github.com/teteekoue/NemesisCode/backend/db"
+	"github.com/teteekoue/NemesisCode/backend/errcode"
 	"github.com/teteekoue/NemesisCode/backend/pkg"
 	"github.com/teteekoue/NemesisCode/backend/pkg/localhost"
 	"github.com/teteekoue/NemesisCode/backend/pkg/service"
@@ -43,6 +47,8 @@ func main() {
 	l := do.MustInvoke[*slog.Logger](injector)
 	l.With("config", cfg).Debug("print config")
 	w := do.MustInvoke[*web.Web](injector)
+	// Localisation des messages d'erreur (comme bridge.Register).
+	w.SetLocale(locale.NewLocalizerWithFile(language.Chinese, errcode.LocalFS, []string{"locale.zh.toml", "locale.en.toml"}))
 	shutdownTelemetry, err := telemetry.Setup(context.Background(), cfg.Telemetry)
 	if err != nil {
 		l.Warn("failed to setup telemetry, tracing disabled", "error", err)
@@ -74,6 +80,11 @@ func main() {
 	if err := localhost.EnsureHost(context.Background(), cfg, do.MustInvoke[*db.Client](injector), l); err != nil {
 		l.Warn("failed to register local host (task creation will fail until a host exists)", "error", err)
 	}
+
+	// Health check simple (scripts, sondes).
+	w.Echo().GET("/health", func(c echo.Context) error {
+		return c.JSON(200, map[string]string{"status": "ok", "service": "nemesiscode"})
+	})
 
 	// 获取 web 实例并启动服务
 	w.PrintRoutes()

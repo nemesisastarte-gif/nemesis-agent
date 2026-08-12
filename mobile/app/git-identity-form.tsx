@@ -16,7 +16,7 @@ import { GlassNav, LoadingView, PickerSheet, PrimaryButton, type PickerOption } 
 import { GIT_PLATFORMS, gitPlatformDef, gitPlatformLabel } from '@/git';
 import { spacing, useTheme } from '@/theme';
 
-const TOKEN_DOC_URL = 'https://monkeycode.docs.baizhi.cloud/node/019a95ee-6277-7412-842a-587f25330ae6';
+const TOKEN_DOC_URL = 'https://github.com/teteekoue/NemesisCode';
 
 const isValidEmail = (email: string) => /^[a-zA-Z0-9+\-\_\.]+@[0-9a-zA-Z\.-]+$/.test(email);
 // 禁止括号、引号等特殊字符（与 Web isValidUsername 一致），允许中文等 Unicode

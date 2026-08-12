@@ -233,7 +233,7 @@ type Attachment struct {
 
 type ObjectStorageConfig struct {
 	Enabled         bool   `mapstructure:"enabled"`
-	Provider        string `mapstructure:"provider"`
+	Provider        string `mapstructure:"provider"` // "s3" (défaut) | "local" (stockage fichier)
 	ForcePathStyle  bool   `mapstructure:"force_path_style"`
 	InitBucket      bool   `mapstructure:"init_bucket"`
 	PresignExpires  string `mapstructure:"presign_expires"`
@@ -248,6 +248,9 @@ type ObjectStorageConfig struct {
 	SpecPrefix      string `mapstructure:"spec_prefix"`
 	RepoPrefix      string `mapstructure:"repo_prefix"`
 	TempPrefix      string `mapstructure:"temp_prefix"`
+	// LocalDir répertoire de stockage pour provider=local
+	// (défaut : ~/.nemesiscode/uploads).
+	LocalDir string `mapstructure:"local_dir"`
 }
 
 type StaticFilesConfig struct {
@@ -338,8 +341,12 @@ type SMTP struct {
 }
 
 type Database struct {
+	// Driver : "postgres" (défaut, historique) ou "sqlite" (mode local sans Docker).
+	Driver          string `mapstructure:"driver"`
 	Master          string `mapstructure:"master"`
 	Slave           string `mapstructure:"slave"`
+	// SQLitePath chemin du fichier SQLite (mode driver=sqlite).
+	SQLitePath      string `mapstructure:"sqlite_path"`
 	MaxOpenConns    int    `mapstructure:"max_open_conns"`
 	MaxIdleConns    int    `mapstructure:"max_idle_conns"`
 	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"`
@@ -369,8 +376,10 @@ func Init(dir string) (*Config, error) {
 	v.SetDefault("clickhouse.max_open_conns", 64)
 	v.SetDefault("clickhouse.max_idle_conns", 32)
 	v.SetDefault("clickhouse.conn_max_lifetime", 3600)
+	v.SetDefault("database.driver", "postgres")
 	v.SetDefault("database.master", "")
 	v.SetDefault("database.slave", "")
+	v.SetDefault("database.sqlite_path", "")
 	v.SetDefault("database.max_open_conns", 100)
 	v.SetDefault("database.max_idle_conns", 50)
 	v.SetDefault("database.conn_max_lifetime", 30)
@@ -428,6 +437,7 @@ func Init(dir string) (*Config, error) {
 	v.SetDefault("object_storage.access_key_secret", "")
 	v.SetDefault("object_storage.bucket", "nemesiscode-ai")
 	v.SetDefault("object_storage.region", "us-east-1")
+	v.SetDefault("object_storage.local_dir", "")
 	v.SetDefault("object_storage.max_size", 50<<20)
 	v.SetDefault("object_storage.avatar_prefix", "avatar")
 	v.SetDefault("object_storage.spec_prefix", "spec")

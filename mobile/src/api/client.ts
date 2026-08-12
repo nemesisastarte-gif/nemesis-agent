@@ -32,7 +32,10 @@ import type {
 } from './types';
 import { base64Encode } from '@/messages/base64';
 
-export const DEFAULT_BASE_URL = 'https://monkeycode-ai.com';
+// Serveur par défaut : surchargeable à la compilation via EXPO_PUBLIC_API_URL
+// (ex. : EXPO_PUBLIC_API_URL=http://192.168.1.10:8888 npx expo run:android).
+// L'écran de connexion permet aussi de saisir l'adresse du serveur.
+export const DEFAULT_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8888';
 
 let baseUrl = DEFAULT_BASE_URL;
 let basicAuth = ''; // 形如 "user:pass"，用于连接带 HTTP Basic Auth 的测试环境（反向代理层鉴权）

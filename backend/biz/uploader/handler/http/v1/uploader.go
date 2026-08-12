@@ -64,6 +64,11 @@ func NewUploaderHandler(i *do.Injector) (*UploaderHandler, error) {
 	g.Use(auth.Auth(), targetActive.TargetActive())
 	g.POST("", web.BindHandler(h.Upload))
 	g.POST("/presign", web.BindHandler(h.Presign))
+	if cfg.ObjectStorage.Provider == "local" {
+		// Upload « direct » local (PUT, clé fournie en query) — utilisé par le
+		// presign local pour remplacer le PUT signé S3.
+		g.PUT("/direct", web.BindHandler(h.DirectPut))
+	}
 	w.Group(asseturl.Path).GET("", web.BaseHandler(h.Asset), auth.Auth(), targetActive.TargetActive())
 	return h, nil
 }
@@ -135,6 +140,51 @@ func (h *UploaderHandler) Presign(c *web.Context, req domain.PresignReq) error {
 	presign.UploadURL = uploadURLForRequest(presign.UploadURL, c.Request())
 	presign.AccessURL = assetAccessURL(h.cfg.ObjectStorage.TempPrefix, filename)
 	return c.Success(domain.PresignResp{UploadURL: presign.UploadURL, AccessURL: presign.AccessURL})
+}
+
+// DirectPut écrit un objet local depuis un PUT brut (clé dans ?key=).
+// Seulement actif avec object_storage.provider=local — équivalent du PUT
+// signé S3 des presigns classiques.
+func (h *UploaderHandler) DirectPut(c *web.Context, req domain.DirectPutReq) error {
+	if h == nil || h.client == nil {
+		return errcode.ErrBadRequest.Wrap(fmt.Errorf("object storage is disabled"))
+	}
+	user := middleware.GetUser(c)
+	if user == nil {
+		return errcode.ErrUnauthorized
+	}
+	key := strings.TrimSpace(req.Key)
+	cleanKey, ok := asseturl.CleanKey(key)
+	if !ok || cleanKey == "" {
+		return errcode.ErrBadRequest.Wrap(fmt.Errorf("invalid key"))
+	}
+	maxSize := h.cfg.ObjectStorage.MaxSize
+	if maxSize <= 0 {
+		maxSize = defaultUploadMaxSize
+	}
+	data, err := io.ReadAll(io.LimitReader(c.Request().Body, maxSize+1))
+	if err != nil {
+		return err
+	}
+	if int64(len(data)) > maxSize {
+		return errcode.ErrBadRequest.Wrap(fmt.Errorf("file exceeds limit"))
+	}
+	// Split prefix/filename sur le premier "/" (contrat objectKey).
+	prefix, filename := splitKey(cleanKey)
+	if err := h.client.PutFile(c.Request().Context(), prefix, filename, bytes.NewReader(data)); err != nil {
+		h.logger.With("error", err).ErrorContext(c.Request().Context(), "direct upload failed")
+		return err
+	}
+	return c.Success(assetAccessURL(prefix, filename))
+}
+
+// splitKey découpe une clé "prefix/filename" au premier "/" (contrat
+// objectKey du stockage objet). Sans "/", prefix est vide.
+func splitKey(key string) (prefix, filename string) {
+	if i := strings.IndexByte(key, '/'); i >= 0 {
+		return key[:i], key[i+1:]
+	}
+	return "", key
 }
 
 func (h *UploaderHandler) Asset(c *web.Context) error {

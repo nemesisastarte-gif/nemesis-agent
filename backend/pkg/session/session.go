@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/teteekoue/NemesisCode/backend/config"
+	"github.com/teteekoue/NemesisCode/backend/pkg/store"
 )
 
 // Session 基于 Redis Hash 的会话管理
@@ -24,13 +24,9 @@ type Session struct {
 }
 
 func New(cfg *config.Config) *Session {
-	addr := net.JoinHostPort(cfg.Redis.Host, fmt.Sprint(cfg.Redis.Port))
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: cfg.Redis.Pass,
-		DB:       cfg.Redis.DB,
-	})
-	return &Session{cfg: cfg, rdb: rdb}
+	// Utilise le même canal que pkg/store : host vide → Redis en mémoire
+	// intégré (miniredis), aucune dépendance externe en mode local.
+	return &Session{cfg: cfg, rdb: store.NewRedisCli(cfg)}
 }
 
 func (s *Session) expire() time.Duration {
