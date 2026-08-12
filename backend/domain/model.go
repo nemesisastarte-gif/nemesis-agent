@@ -278,7 +278,7 @@ type UpdateModelReq struct {
 }
 
 type GetProviderModelListReq struct {
-	Provider  consts.ModelProvider `json:"provider" query:"provider" validate:"required,oneof=SiliconFlow OpenAI Ollama DeepSeek Moonshot AzureOpenAI BaiZhiCloud Hunyuan BaiLian Volcengine Gemini Other"`
+	Provider  consts.ModelProvider `json:"provider" query:"provider" validate:"required,oneof=SiliconFlow OpenAI Ollama DeepSeek Moonshot AzureOpenAI BaiZhiCloud Hunyuan BaiLian Volcengine Gemini NVIDIA Fireworks Cohere Custom Other"`
 	BaseURL   string               `json:"base_url" query:"base_url" validate:"required"`
 	APIKey    string               `json:"api_key" query:"api_key" validate:"required"`
 	APIHeader string               `json:"api_header" query:"api_header"`
