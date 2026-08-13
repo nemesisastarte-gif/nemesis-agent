@@ -95,6 +95,35 @@ TARGET=http://127.0.0.1:8888 pnpm run dev:offline -- --host 0.0.0.0 --port 5173
 5. Le **terminal**, les **fichiers** et les **diffs** de l'interface web
    agissent directement sur la machine hôte.
 
+## Obtenir le vrai moteur ohmyagent
+
+Le mode local pilote le **vrai moteur** `ohmyagent` (protocole `--stdio`
+JSON-RPC) — aucune réimplémentation. Le code source est référencé par le
+sous-module `agent/` (dépôt `chaitin/OhMyAgent`, privé).
+
+```bash
+# 1. Récupérer le code du moteur (nécessite l'accès au dépôt privé)
+git submodule update --init agent
+export OHMYAGENT_SRC="$PWD/agent"
+
+# 2. Compiler le moteur (le dépôt fournit son propre make — cf. desktop/README)
+cd "$OHMYAGENT_SRC" && make   # produit bin/ohmyagent
+
+# 3. Le rendre visible du backend
+export MCAI_TASKFLOW_LOCAL_AGENT_BIN="$OHMYAGENT_SRC/bin/ohmyagent"
+# (ou placer le binaire dans le PATH)
+```
+
+Le backend cherche le binaire dans l'ordre :
+`MCAI_TASKFLOW_LOCAL_AGENT_BIN` (défaut `ohmyagent`) → PATH.
+S'il est absent, la création de tâche échoue avec un message clair
+(`start ohmyagent: executable file not found`).
+
+Contrat exact (handshake `system/ready`, `session/create`,
+`session/sendMessage`, notifications `event/stream` → chunks ACP,
+`permission/request` auto-approuvé, `turn/stopped` → fin) :
+[docs/local-mode-design.md](./local-mode-design.md).
+
 ## Variables utiles
 
 | Variable | Défaut | Rôle |
@@ -134,5 +163,6 @@ EXPO_PUBLIC_API_URL=http://192.168.1.10:8888 npx expo run:android
   (sessions utilisateur et données persistées en base restent intactes).
 - Le moteur agent (`ohmyagent`) doit être installé sur la machine hôte ;
   sans lui, le backend fonctionne mais les tâches ne démarrent pas.
+  Voir « Obtenir le vrai moteur ohmyagent » ci-dessous.
 - Pas d'isolation : l'agent tourne avec les droits de l'utilisateur qui lance
   le backend — à réserver à une machine de confiance.
