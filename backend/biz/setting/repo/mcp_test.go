@@ -3,9 +3,10 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"path/filepath"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/ncruces/go-sqlite3/driver"
 
 	"github.com/teteekoue/NemesisCode/backend/config"
 	"github.com/teteekoue/NemesisCode/backend/consts"
@@ -215,7 +216,11 @@ func TestDeleteUserUpstreamMarksDeletedAt(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	dsn := "file:user-mcp-upstream-delete?mode=memory&cache=shared&_fk=1"
+	// Base fichier temporaire : le test ouvre DEUX connexions sur la même
+	// base (client ent + sql brut). La mémoire partagée nommée
+	// (mode=memory&cache=shared) n'est pas partagée entre deux pools avec
+	// le driver SQLite 100% Go — un fichier, lui, l'est.
+	dsn := "file:" + filepath.Join(t.TempDir(), "mcp-delete.db") + "?_pragma=foreign_keys(1)"
 	client := enttest.Open(t, "sqlite3", dsn)
 	defer client.Close()
 

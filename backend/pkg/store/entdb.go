@@ -16,7 +16,10 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
+	// SQLite 100% Go (aucune dépendance C) : indispensable pour produire un
+	// binaire statique (CGO_ENABLED=0) qui tourne sur n'importe quel Linux
+	// x86-64, y compris de vieilles machines sans glibc récente (paquet .deb).
+	_ "github.com/ncruces/go-sqlite3/driver"
 
 	"github.com/teteekoue/NemesisCode/backend/config"
 	"github.com/teteekoue/NemesisCode/backend/db"
@@ -82,7 +85,7 @@ func newEntSQLite(cfg *config.Config, logger *slog.Logger) (*db.Client, error) {
 		return nil, fmt.Errorf("create sqlite dir: %w", err)
 	}
 
-	dsn := "file:" + path + "?_fk=1&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
+	dsn := "file:" + path + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
 	w, err := sql.Open(dialect.SQLite, dsn)
 	if err != nil {
 		return nil, err

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/ncruces/go-sqlite3/driver"
 
 	"github.com/teteekoue/NemesisCode/backend/biz/mcphub/repo"
 	"github.com/teteekoue/NemesisCode/backend/consts"

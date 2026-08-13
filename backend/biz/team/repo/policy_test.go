@@ -9,7 +9,7 @@ import (
 
 	"github.com/teteekoue/NemesisCode/backend/db"
 	"github.com/teteekoue/NemesisCode/backend/domain"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/ncruces/go-sqlite3/driver"
 )
 
 func TestTeamPolicyRepoUpdateTaskVMIdlePolicyUpdatesTaskConcurrencyLimit(t *testing.T) {

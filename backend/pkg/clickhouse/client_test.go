@@ -12,7 +12,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/ncruces/go-sqlite3/driver"
 
 	"github.com/teteekoue/NemesisCode/backend/config"
 )

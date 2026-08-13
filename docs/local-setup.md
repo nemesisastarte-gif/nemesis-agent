@@ -4,6 +4,22 @@ Guide d'installation et de lancement de NemesisCode **sans aucune
 infrastructure cloud** : la machine qui exécute le backend devient
 l'environnement de développement de l'agent.
 
+## Option rapide : paquet .deb tout-en-un (Linux 64 bits)
+
+Pour un PC Linux x86-64 (y compris vieux PC sans AVX — Core 2 Duo), un
+paquet `.deb` prêt à l'emploi est fourni : binaire statique (aucune
+dépendance glibc, SQLite 100% Go), frontend compilé servi par le backend,
+Redis intégré. **Aucune installation supplémentaire.**
+
+```bash
+sudo dpkg -i nemesiscode_1.0.0_amd64.deb
+nemesiscode on       # → http://localhost:5000  (Admin / Admin)
+nemesiscode off      # arrêt
+```
+
+Voir [docs/deb-package.md](./deb-package.md) pour tous les détails
+(moteur ohmyagent, port, désinstallation, reconstruction).
+
 ## Prérequis
 
 | Composant | Linux (Debian/Ubuntu) | Termux (Android) |

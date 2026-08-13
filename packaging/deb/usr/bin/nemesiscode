@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+# NemesisCode — contrôleur tout-en-un (installation .deb).
+#
+#   nemesiscode on      démarrer tout (backend + frontend sur http://localhost:5000)
+#   nemesiscode off     arrêter
+#   nemesiscode status  état
+#   nemesiscode logs    suivre les logs
+#   nemesiscode restart
+#
+# Aucune dépendance externe : le binaire est statique, la base est SQLite,
+# Redis est intégré en mémoire, le frontend est servi par le backend.
+set -euo pipefail
+
+SERVER_BIN="/usr/share/nemesiscode/nemesiscode-server"
+WEB_DIR="/usr/share/nemesiscode/web"
+PORT="${NEMESISCODE_PORT:-5000}"
+
+# État par utilisateur : pas besoin de root pour lancer/arrêter.
+STATE_DIR="${NEMESISCODE_STATE:-$HOME/.nemesiscode}"
+RUNTIME_DIR="$STATE_DIR/.runtime"
+PID_FILE="$RUNTIME_DIR/server.pid"
+LOG_FILE="$RUNTIME_DIR/server.log"
+
+server_pid() {
+  [ -f "$PID_FILE" ] && cat "$PID_FILE" 2>/dev/null || true
+}
+
+is_running() {
+  local pid
+  pid="$(server_pid)"
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
+port_busy() {
+  # Vrai si un processus écoute déjà sur 127.0.0.1:$PORT (hors notre serveur).
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq ":$PORT\$"
+  else
+    (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && exec 3>&- 3<&- && return 0 || return 1
+  fi
+}
+
+resolve_engine() {
+  # Le moteur ohmyagent est OPTIONNEL au démarrage (fourni séparément, dépôt
+  # privé). S'il est présent à un emplacement connu, on le branche.
+  local cand
+  for cand in \
+    "$STATE_DIR/ohmyagent" \
+    /usr/share/nemesiscode/ohmyagent \
+    "$HOME/.local/bin/ohmyagent" \
+    /usr/local/bin/ohmyagent; do
+    if [ -x "$cand" ]; then
+      echo "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
+cmd_on() {
+  if is_running; then
+    echo "✅ NemesisCode tourne déjà (PID $(server_pid))."
+    echo "   ➜ http://localhost:$PORT"
+    return 0
+  fi
+  if port_busy; then
+    echo "❌ Le port $PORT est déjà utilisé par un autre programme." >&2
+    echo "   Libérez-le ou choisissez un autre port : NEMESISCODE_PORT=8080 nemesiscode on" >&2
+    return 1
+  fi
+  if [ ! -x "$SERVER_BIN" ]; then
+    echo "❌ Binaire introuvable : $SERVER_BIN (réinstallez le paquet)." >&2
+    return 1
+  fi
+
+  mkdir -p "$RUNTIME_DIR"
+
+  # Configuration locale par défaut (surchargeable par l'environnement).
+  export MCAI_TASKFLOW_MODE="${MCAI_TASKFLOW_MODE:-local}"
+  export MCAI_DATABASE_DRIVER="${MCAI_DATABASE_DRIVER:-sqlite}"
+  export MCAI_REDIS_HOST="${MCAI_REDIS_HOST:-}"
+  export MCAI_INIT_TEAM_EMAIL="${MCAI_INIT_TEAM_EMAIL:-Admin}"
+  export MCAI_INIT_TEAM_PASSWORD="${MCAI_INIT_TEAM_PASSWORD:-Admin}"
+  export MCAI_INIT_TEAM_NAME="${MCAI_INIT_TEAM_NAME:-NemesisCode Admin}"
+  export MCAI_INIT_TEAM_IMAGE="${MCAI_INIT_TEAM_IMAGE:-local-env}"
+  export MCAI_SECURITY_CAPTCHA_ENABLED="${MCAI_SECURITY_CAPTCHA_ENABLED:-false}"
+  export MCAI_SERVER_ADDR="${MCAI_SERVER_ADDR:-:$PORT}"
+  export MCAI_ROOT_PATH="${MCAI_ROOT_PATH:-$RUNTIME_DIR}"
+  export MCAI_OBJECT_STORAGE_ENABLED="${MCAI_OBJECT_STORAGE_ENABLED:-true}"
+  export MCAI_OBJECT_STORAGE_PROVIDER="${MCAI_OBJECT_STORAGE_PROVIDER:-local}"
+  export MCAI_OBJECT_STORAGE_LOCAL_DIR="${MCAI_OBJECT_STORAGE_LOCAL_DIR:-$STATE_DIR/uploads}"
+  export MCAI_STATIC_FILES_ENABLED="${MCAI_STATIC_FILES_ENABLED:-true}"
+  export MCAI_STATIC_FILES_DIR="${MCAI_STATIC_FILES_DIR:-$WEB_DIR}"
+  export MCAI_STATIC_FILES_ROUTE_PREFIX="${MCAI_STATIC_FILES_ROUTE_PREFIX:-/}"
+  export MCAI_TASKFLOW_LOCAL_PERMISSION_MODE="${MCAI_TASKFLOW_LOCAL_PERMISSION_MODE:-yolo}"
+
+  local engine
+  if engine="$(resolve_engine)"; then
+    export MCAI_TASKFLOW_LOCAL_AGENT_BIN="${MCAI_TASKFLOW_LOCAL_AGENT_BIN:-$engine}"
+  else
+    echo "ℹ️  Moteur ohmyagent non trouvé — l'interface (modèles, tâches) marchera,"
+    echo "   mais l'exécution des tâches nécessite le binaire du moteur."
+    echo "   Placez-le dans ~/.nemesiscode/ohmyagent (voir docs/deb-package.md)."
+  fi
+
+  echo "==> Démarrage de NemesisCode (port $PORT)…"
+  # setsid : le serveur devient chef de groupe → « off » tue aussi les enfants
+  # (moteur agent éventuel).
+  setsid "$SERVER_BIN" >>"$LOG_FILE" 2>&1 &
+  local pid=$!
+  echo "$pid" >"$PID_FILE"
+
+  local ok=""
+  for _ in $(seq 1 60); do
+    if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+      ok=1
+      break
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+
+  if [ -z "$ok" ]; then
+    echo "❌ Le serveur n'a pas démarré. Logs :" >&2
+    tail -n 30 "$LOG_FILE" >&2 || true
+    return 1
+  fi
+
+  echo "✅ NemesisCode est prêt !"
+  echo "   ➜ Frontend : http://localhost:$PORT"
+  echo "   ➜ Connexion : ${MCAI_INIT_TEAM_EMAIL} / ${MCAI_INIT_TEAM_PASSWORD}"
+  echo "   ➜ Données : $STATE_DIR (base, espaces de travail, uploads)"
+  echo "   ➜ Logs : $LOG_FILE  ·  Arrêt : nemesiscode off"
+}
+
+cmd_off() {
+  local pid
+  pid="$(server_pid)"
+  if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
+    rm -f "$PID_FILE"
+    echo "NemesisCode n'est pas lancé."
+    return 0
+  fi
+  echo "==> Arrêt de NemesisCode (PID $pid)…"
+  kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+  for _ in $(seq 1 30); do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 1
+  done
+  kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+  rm -f "$PID_FILE"
+  echo "✅ NemesisCode arrêté."
+}
+
+cmd_status() {
+  if is_running; then
+    echo "✅ NemesisCode : EN COURS (PID $(server_pid))"
+    if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+      echo "   ➜ http://localhost:$PORT (sain)"
+    else
+      echo "   ⚠️  Processus vivant mais /health ne répond pas."
+    fi
+  else
+    echo "⏹  NemesisCode : arrêté"
+  fi
+}
+
+cmd_logs() {
+  [ -f "$LOG_FILE" ] && tail -n 100 -f "$LOG_FILE" || { echo "Pas encore de logs."; return 1; }
+}
+
+case "${1:-}" in
+  on|start)  cmd_on ;;
+  off|stop)  cmd_off ;;
+  restart)   cmd_off; cmd_on ;;
+  status)    cmd_status ;;
+  logs)      cmd_logs ;;
+  *)
+    echo "Usage : nemesiscode {on|off|restart|status|logs}"
+    echo
+    echo "  on       démarre NemesisCode (frontend + backend) sur http://localhost:$PORT"
+    echo "  off      arrête tout"
+    echo "  status   état actuel"
+    echo "  logs     suit les logs du serveur"
+    echo
+    echo "Variables utiles : NEMESISCODE_PORT (défaut $PORT), MCAI_INIT_TEAM_PASSWORD,"
+    echo "MCAI_TASKFLOW_LOCAL_AGENT_BIN (binaire du moteur ohmyagent)."
+    exit 1
+    ;;
+esac

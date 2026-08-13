@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/ncruces/go-sqlite3/driver"
 
 	taskrepo "github.com/teteekoue/NemesisCode/backend/biz/task/repo"
 	"github.com/teteekoue/NemesisCode/backend/consts"

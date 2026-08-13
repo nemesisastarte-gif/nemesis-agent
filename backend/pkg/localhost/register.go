@@ -16,6 +16,7 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/consts"
 	"github.com/teteekoue/NemesisCode/backend/db"
 	"github.com/teteekoue/NemesisCode/backend/db/host"
+	"github.com/teteekoue/NemesisCode/backend/db/task"
 	"github.com/teteekoue/NemesisCode/backend/db/user"
 	"github.com/teteekoue/NemesisCode/backend/pkg/taskflow"
 )
@@ -63,6 +64,35 @@ func EnsureHost(ctx context.Context, cfg *config.Config, dbc *db.Client, l *slog
 		return fmt.Errorf("upsert local host %s: %w", hostID, err)
 	}
 	l.InfoContext(ctx, "local host registered", "host_id", hostID, "owner", owner)
+
+	// Au démarrage local, aucune tâche ne peut être légitimement en cours
+	// (le moteur n'a pas encore tourné). Les tâches laissées en pending /
+	// processing par une session précédente (redémarrage, crash) bloqueraient
+	// la création de nouvelles tâches (hook de concurrence) — on les passe
+	// en error, état terminal visible dans l'interface.
+	if err := reconcileOrphanTasks(ctx, dbc, l); err != nil {
+		return fmt.Errorf("reconcile orphan tasks: %w", err)
+	}
+	return nil
+}
+
+// reconcileOrphanTasks marque en error les tâches restées en pending /
+// processing au démarrage (mode local uniquement — appelé par EnsureHost).
+func reconcileOrphanTasks(ctx context.Context, dbc *db.Client, l *slog.Logger) error {
+	upd, err := dbc.Task.Update().
+		Where(
+			task.DeletedAtIsNil(),
+			task.StatusIn(consts.TaskStatusPending, consts.TaskStatusProcessing),
+		).
+		SetStatus(consts.TaskStatusError).
+		SetCompletedAt(time.Now()).
+		Save(ctx)
+	if err != nil {
+		return err
+	}
+	if upd > 0 {
+		l.InfoContext(ctx, "local startup: orphan tasks marked error", "count", upd)
+	}
 	return nil
 }
 

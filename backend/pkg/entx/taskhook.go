@@ -14,9 +14,13 @@ import (
 )
 
 // sqliteMode indique si la base est SQLite (mode local). Posé par
-// pkg/store.NewEntDBV2. En SQLite, l'écriture est déjà sérialisée par le
-// verrou d'écriture (une seule connexion) — pas besoin d'advisory lock.
-var sqliteMode bool
+// pkg/store.NewEntDBV2 (newEntPostgres → false, newEntSQLite → true).
+// Défaut : true — les tests unitaires ouvrent des bases sqlite en mémoire
+// via enttest sans passer par NewEntDBV2 ; en production le flag est
+// toujours positionné explicitement pour le driver réel.
+// En SQLite, l'écriture est déjà sérialisée par le verrou d'écriture
+// (une seule connexion) — pas besoin d'advisory lock ni de FOR UPDATE.
+var sqliteMode = true
 
 // SetSQLiteMode configure le mode base de données pour les hooks entx.
 func SetSQLiteMode(v bool) { sqliteMode = v }

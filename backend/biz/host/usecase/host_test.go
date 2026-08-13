@@ -13,7 +13,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/ncruces/go-sqlite3/driver"
 	"github.com/redis/go-redis/v9"
 	"github.com/samber/do"
 
@@ -25,7 +25,19 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/domain"
 	"github.com/teteekoue/NemesisCode/backend/pkg/delayqueue"
 	"github.com/teteekoue/NemesisCode/backend/pkg/taskflow"
+	"github.com/teteekoue/NemesisCode/backend/pkg/vmrecycle"
 )
+
+// recycleStub : le test DeleteVM n'exerce pas le recyclage lui-même.
+type recycleStub struct{}
+
+func (recycleStub) Recycle(_ context.Context, vmID string, _ consts.VMRecycleMethod) (vmrecycle.Result, error) {
+	return vmrecycle.Result{VMID: vmID, Status: vmrecycle.StatusRecycled}, nil
+}
+
+func (recycleStub) ForceRecycle(_ context.Context, vmID string, _ consts.VMRecycleMethod) (vmrecycle.Result, error) {
+	return vmrecycle.Result{VMID: vmID, Status: vmrecycle.StatusRecycled}, nil
+}
 
 func TestGetInstallCommandStoresTokenForTwoHours(t *testing.T) {
 	t.Parallel()
@@ -409,6 +421,7 @@ func TestHostUsecase_DeleteVMFinishesBoundTasks(t *testing.T) {
 	u := &HostUsecase{
 		repo:          hostRepo,
 		taskflow:      &preinsertTaskflowStub{vm: &preinsertVMCreateStub{db: client}},
+		recycler:      recycleStub{},
 		logger:        logger,
 		vmexpireQueue: delayqueue.NewVMExpireQueue(redisClient, logger),
 	}

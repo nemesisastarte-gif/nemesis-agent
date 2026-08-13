@@ -17,7 +17,7 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db/enttest"
 	"github.com/teteekoue/NemesisCode/backend/domain"
 	"github.com/teteekoue/NemesisCode/backend/pkg/delayqueue"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/ncruces/go-sqlite3/driver"
 )
 
 func TestDeadlineRepairerCreatesDeadlineFromCurrentPolicy(t *testing.T) {

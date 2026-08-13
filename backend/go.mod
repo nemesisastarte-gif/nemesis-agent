@@ -26,7 +26,7 @@ require (
 	github.com/labstack/echo/v4 v4.15.1
 	github.com/lib/pq v1.10.9
 	github.com/mark3labs/mcp-go v0.39.1
-	github.com/mattn/go-sqlite3 v1.14.22
+	github.com/ncruces/go-sqlite3 v0.35.3
 	github.com/palantir/go-githubapp v0.38.1
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/redis/go-redis/v9 v9.18.0
@@ -39,10 +39,10 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.38.0
 	go.opentelemetry.io/otel/sdk v1.42.0
 	go.opentelemetry.io/otel/trace v1.42.0
-	golang.org/x/crypto v0.49.0
+	golang.org/x/crypto v0.54.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sync v0.20.0
-	golang.org/x/text v0.35.0
+	golang.org/x/sync v0.22.0
+	golang.org/x/text v0.40.0
 )
 
 require (
@@ -111,6 +111,8 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/ncruces/go-sqlite3-wasm/v3 v3.2.35304 // indirect
+	github.com/ncruces/julianday v1.0.0 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.6.1 // indirect
 	github.com/paulmach/orb v0.12.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
@@ -149,9 +151,9 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.42.0 // indirect
+	golang.org/x/tools v0.45.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/grpc v1.75.1 // indirect
@@ -211,4 +213,7 @@ replace (
 	gopkg.in/ini.v1 => github.com/go-ini/ini v1.66.2
 	gopkg.in/yaml.v2 => github.com/go-yaml/yaml v0.0.0-20200121171940-53403b58ad1b
 	gopkg.in/yaml.v3 => github.com/go-yaml/yaml v0.0.0-20220527083530-f6f7691b1fde
+	// ncruces/go-sqlite3 (SQLite 100% Go, paquet .deb statique) : le module
+	// lukechampine.com est hébergé sur GitHub (github.com/lukechampine/adiantum).
+	lukechampine.com/adiantum => github.com/lukechampine/adiantum v1.1.1
 )

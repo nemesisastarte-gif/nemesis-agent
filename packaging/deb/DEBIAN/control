@@ -1,0 +1,24 @@
+Package: nemesiscode
+Version: 1.0.0
+Section: devel
+Priority: optional
+Architecture: amd64
+Maintainer: NemesisCode Team <nemesis@localhost>
+Installed-Size: 180000
+Depends:
+Recommends: curl
+Description: NemesisCode — plateforme d'agents de code 100% locale (paquet tout-en-un)
+ NemesisCode est une plateforme d'agents de code (fork de MonkeyCode) qui
+ fonctionne entièrement en local : base SQLite, Redis intégré en mémoire,
+ stockage fichier, frontend servi par le backend sur un seul port.
+ .
+ Le paquet contient un binaire statique (aucune dépendance glibc, aucune
+ instruction AVX requise — compatible Core 2 Duo / vieux PC) et le frontend
+ compilé.
+ .
+ Utilisation :
+   nemesiscode on     → http://localhost:5000 (connexion Admin / Admin)
+   nemesiscode off    → arrêt
+ .
+ L'exécution des tâches nécessite le moteur agent ohmyagent (dépôt privé),
+ à placer dans ~/.nemesiscode/ohmyagent — voir docs/deb-package.md.
