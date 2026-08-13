@@ -446,10 +446,20 @@ func (h *InternalHostHandler) VmReady(c *web.Context, req taskflow.VirtualMachin
 		return err
 	}
 
+	// Mode local : le callback vm-ready part en asynchrone pendant la création
+	// de la tâche — il peut arriver avant que la machine à états (Redis) n'ait
+	// enregistré la transition "" → pending. Dans ce cas la transition vers
+	// processing échoue : on renvoie une erreur pour que l'appelant retente
+	// (idempotent — les appels suivants sont ignorés une fois processing).
+	var failed []uuid.UUID
 	for _, t := range vm.Edges.Tasks {
 		taskCtx := telemetry.WithTaskID(ctx, t.ID.String())
 		h.logger.With("task", t).DebugContext(taskCtx, "vm-ready")
 		if t.Status == consts.TaskStatusProcessing {
+			continue
+		}
+		if t.Status == consts.TaskStatusFinished {
+			// Tâche déjà terminée : rien à lancer, pas une erreur.
 			continue
 		}
 
@@ -458,7 +468,12 @@ func (h *InternalHostHandler) VmReady(c *web.Context, req taskflow.VirtualMachin
 			UserID: t.UserID,
 		}); err != nil {
 			h.logger.With("task", t, "error", err).ErrorContext(taskCtx, "failed to transition task to processing")
+			failed = append(failed, t.ID)
 		}
+	}
+
+	if len(failed) > 0 {
+		return fmt.Errorf("failed to transition %d task(s) to processing", len(failed))
 	}
 
 	return c.Success(nil)

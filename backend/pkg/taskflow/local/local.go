@@ -47,14 +47,25 @@ type Client struct {
 	hostName string
 	shell    string
 	logger   *slog.Logger
+	// internalBaseURL : base URL du serveur (pour les callbacks internes
+	// comme /internal/vm-ready qui déclenchent le lancement des tâches).
+	internalBaseURL string
 
 	mu  sync.Mutex
 	vms map[string]*VM
 }
 
+// WithInternalBaseURL configure l'URL de base du serveur backend local
+// (ex. http://127.0.0.1:8888) pour les callbacks internes.
+func WithInternalBaseURL(u string) func(*Client) {
+	return func(c *Client) {
+		c.internalBaseURL = u
+	}
+}
+
 // NewClient 创建本机 taskflow 客户端。workspace root 缺省
 // ~/.nemesiscode/workspaces，目录不存在则创建。
-func NewClient(cfg config.LocalTaskFlow, logger *slog.Logger) (*Client, error) {
+func NewClient(cfg config.LocalTaskFlow, logger *slog.Logger, opts ...func(*Client)) (*Client, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -88,7 +99,7 @@ func NewClient(cfg config.LocalTaskFlow, logger *slog.Logger) (*Client, error) {
 		shell = "/bin/sh"
 	}
 
-	return &Client{
+	c := &Client{
 		cfg:      cfg,
 		root:     root,
 		hostID:   hostID,
@@ -96,7 +107,11 @@ func NewClient(cfg config.LocalTaskFlow, logger *slog.Logger) (*Client, error) {
 		shell:    shell,
 		logger:   logger.With("taskflow", "local"),
 		vms:      make(map[string]*VM),
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c, nil
 }
 
 func expandHome(p string) string {

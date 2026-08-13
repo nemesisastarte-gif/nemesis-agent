@@ -108,8 +108,7 @@ func (h *HostRepo) UpsertVirtualMachine(ctx context.Context, vm *taskflow.Virtua
 	}
 
 	return entx.WithTx2(ctx, h.db, func(tx *db.Tx) error {
-		if oldVm, err := tx.VirtualMachine.Query().
-			ForUpdate().
+		if oldVm, err := entx.WithForUpdate(tx.VirtualMachine.Query()).
 			Where(virtualmachine.ID(vm.ID)).
 			First(ctx); err == nil {
 			up := tx.VirtualMachine.UpdateOneID(vm.ID).
@@ -218,8 +217,7 @@ func (h *HostRepo) UpsertHost(ctx context.Context, info *taskflow.Host) error {
 
 // GetVirtualMachineWithUser implements domain.HostRepo.
 func (h *HostRepo) GetVirtualMachineWithUser(ctx context.Context, uid uuid.UUID, id string) (*db.VirtualMachine, error) {
-	vm, err := h.db.VirtualMachine.Query().
-		ForUpdate().
+	vm, err := entx.WithForUpdate(h.db.VirtualMachine.Query()).
 		WithHost().
 		WithModel().
 		WithTasks().
@@ -237,8 +235,7 @@ func (h *HostRepo) GetVirtualMachineWithUser(ctx context.Context, uid uuid.UUID,
 
 // GetVirtualMachine implements domain.HostRepo.
 func (h *HostRepo) GetVirtualMachine(ctx context.Context, id string) (*db.VirtualMachine, error) {
-	vm, err := h.db.VirtualMachine.Query().
-		ForUpdate().
+	vm, err := entx.WithForUpdate(h.db.VirtualMachine.Query()).
 		WithHost().
 		WithModel().
 		WithTasks().

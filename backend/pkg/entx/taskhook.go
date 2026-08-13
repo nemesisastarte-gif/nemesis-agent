@@ -13,6 +13,14 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/errcode"
 )
 
+// sqliteMode indique si la base est SQLite (mode local). Posé par
+// pkg/store.NewEntDBV2. En SQLite, l'écriture est déjà sérialisée par le
+// verrou d'écriture (une seule connexion) — pas besoin d'advisory lock.
+var sqliteMode bool
+
+// SetSQLiteMode configure le mode base de données pour les hooks entx.
+func SetSQLiteMode(v bool) { sqliteMode = v }
+
 func taskConcurrencyExceeded(count, limit int) bool {
 	if limit <= 0 {
 		limit = 1
@@ -38,10 +46,16 @@ func TaskConcurrencyHook(next ent.Mutator) ent.Mutator {
 			return next.Mutate(ctx, m)
 		}
 		// Advisory lock serializes concurrent creates for the same user.
-		_, err := m.Client().ExecContext(ctx,
-			"SELECT pg_advisory_xact_lock(hashtext($1))", userID.String())
-		if err != nil {
-			return nil, fmt.Errorf("acquire task concurrency lock: %w", err)
+		// Postgres only : pg_advisory_xact_lock / hashtext n'existent pas en
+		// SQLite. En SQLite (mode local) l'écriture est déjà sérialisée par le
+		// verrou d'écriture (une seule connexion d'écriture) — le count + create
+		// dans la même transaction est donc atomique sans verrou supplémentaire.
+		if !sqliteMode {
+			_, err := m.Client().ExecContext(ctx,
+				"SELECT pg_advisory_xact_lock(hashtext($1))", userID.String())
+			if err != nil {
+				return nil, fmt.Errorf("acquire task concurrency lock: %w", err)
+			}
 		}
 		limit := 1
 		if v, ok := TaskConcurrencyLimitFromContext(ctx); ok && v > 0 {

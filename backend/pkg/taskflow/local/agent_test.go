@@ -1,7 +1,6 @@
 package local
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"testing"
 )
@@ -12,12 +11,10 @@ import (
 
 func decodeACPData(t *testing.T, chunkData []byte) map[string]any {
 	t.Helper()
-	raw, err := base64.StdEncoding.DecodeString(string(chunkData))
-	if err != nil {
-		t.Fatalf("chunk data is not base64: %v", err)
-	}
+	// TaskChunk.Data contient le JSON brut ; le transport WebSocket l'encode
+	// en base64 côté fil, et le frontend fait b64decode + JSON.parse.
 	var v map[string]any
-	if err := json.Unmarshal(raw, &v); err != nil {
+	if err := json.Unmarshal(chunkData, &v); err != nil {
 		t.Fatalf("chunk data is not JSON: %v", err)
 	}
 	return v

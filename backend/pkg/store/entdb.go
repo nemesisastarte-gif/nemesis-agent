@@ -35,6 +35,7 @@ func NewEntDBV2(cfg *config.Config, logger *slog.Logger) (*db.Client, error) {
 }
 
 func newEntPostgres(cfg *config.Config, logger *slog.Logger) (*db.Client, error) {
+	entx.SetSQLiteMode(false)
 	w, err := sql.Open(dialect.Postgres, cfg.Database.Master)
 	if err != nil {
 		return nil, err
@@ -68,6 +69,7 @@ func newEntPostgres(cfg *config.Config, logger *slog.Logger) (*db.Client, error)
 // schéma ent. Aucun service externe requis — pensé pour le mode local
 // (Termux, machine nue, sans Docker).
 func newEntSQLite(cfg *config.Config, logger *slog.Logger) (*db.Client, error) {
+	entx.SetSQLiteMode(true)
 	path := cfg.Database.SQLitePath
 	if path == "" {
 		home, err := os.UserHomeDir()

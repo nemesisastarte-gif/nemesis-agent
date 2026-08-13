@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -443,8 +444,20 @@ func (h *TaskHandler) attachStream(ctx context.Context, cancel context.CancelCau
 	attachNow := time.Now().UTC()
 
 	latestTurn, err := h.tasklog.QueryLatestTurn(ctx, task.ID, taskCreatedAt, attachNow, task.LogStore)
+	historyEndNS := attachNow.UnixNano()
 	if err != nil {
-		return fmt.Errorf("query latest turn: %w", err)
+		if errors.Is(err, tasklog.ErrProviderUnavailable) {
+			// Mode local : pas de Loki/ClickHouse — l'historique vient du
+			// LiveStream du backend (TaskLive flush déjà déclenché ci-dessus).
+			// On désactive le filtre temporel : tous les chunks du buffer
+			// (replay) sont considérés comme l'historique.
+			h.logger.DebugContext(ctx, "task log provider unavailable, replaying from live stream buffer",
+				"task_id", task.ID.String(), "error", err)
+			latestTurn = &tasklog.QueryLatestTurnResp{}
+			historyEndNS = 0
+		} else {
+			return fmt.Errorf("query latest turn: %w", err)
+		}
 	}
 	h.writeCursor(wsConn, latestTurn.NextCursor, latestTurn.HasMore)
 	latestTurn.Entries = h.withInitialUserInputFallback(task, latestTurn)
@@ -458,8 +471,9 @@ func (h *TaskHandler) attachStream(ctx context.Context, cancel context.CancelCau
 		return nil
 	}
 
-	// 消费实时流
-	h.consumeLiveStream(ctx, cancel, wsConn, streamCh, attachNow.UnixNano())
+	// 消费实时流（historyEndNS=0 en mode local : le replay du buffer est
+	// renvoyé intégralement comme historique).
+	h.consumeLiveStream(ctx, cancel, wsConn, streamCh, historyEndNS)
 	return nil
 }
 
@@ -530,22 +544,41 @@ type taskUserInputStoragePayload struct {
 }
 
 func parseUserInputData(data []byte) domain.ContinueTaskReq {
+	// Le frontend envoie data = b64(JSON{content: b64(texte), attachments}).
+	// On essaie d'abord le JSON en clair (logs rejoués, autres clients), puis
+	// on décode la couche base64 externe. Le champ content ([]byte) est
+	// décodé du base64 par encoding/json lui-même — on n'accepte le résultat
+	// du décodage que s'il forme le JSON attendu, pour ne jamais altérer un
+	// texte en clair qui ressemblerait à du base64.
+	if req, ok := parseUserInputJSON(data); ok {
+		return req
+	}
+	if decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data))); err == nil {
+		if req, ok := parseUserInputJSON(decoded); ok {
+			return req
+		}
+	}
+	// Ni JSON encodé ni base64 : contenu en clair (message initial, historique).
+	return domain.ContinueTaskReq{Content: data}
+}
+
+func parseUserInputJSON(raw []byte) (domain.ContinueTaskReq, bool) {
 	var stored taskUserInputStoragePayload
-	if err := json.Unmarshal(data, &stored); err == nil && stored.Encoding == "plaintext" {
+	if err := json.Unmarshal(raw, &stored); err == nil && stored.Encoding == "plaintext" {
 		return domain.ContinueTaskReq{
 			Content:     []byte(stored.Content),
 			Attachments: stored.Attachments,
-		}
+		}, true
 	}
 
 	var payload domain.TaskUserInputPayload
-	if err := json.Unmarshal(data, &payload); err == nil && (len(payload.Content) > 0 || len(payload.Attachments) > 0) {
+	if err := json.Unmarshal(raw, &payload); err == nil && (len(payload.Content) > 0 || len(payload.Attachments) > 0) {
 		return domain.ContinueTaskReq{
 			Content:     payload.Content,
 			Attachments: payload.Attachments,
-		}
+		}, true
 	}
-	return domain.ContinueTaskReq{Content: data}
+	return domain.ContinueTaskReq{}, false
 }
 
 func normalizeUserInputData(data []byte) []byte {

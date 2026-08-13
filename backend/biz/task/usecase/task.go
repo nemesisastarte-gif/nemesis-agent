@@ -192,7 +192,7 @@ func (a *TaskUsecase) SwitchModel(ctx context.Context, user *domain.User, taskID
 	if err != nil {
 		return nil, err
 	}
-	if runtimeKey != "" {
+	if runtimeKey != "" && a.cfg.TaskFlow.Mode != "local" {
 		model.APIKey = runtimeKey
 		if a.cfg != nil {
 			model.BaseURL = a.cfg.LLMProxy.BaseURL + "/v1"
@@ -584,7 +584,10 @@ func (a *TaskUsecase) Create(ctx context.Context, user *domain.User, req domain.
 	git.URL = giturl.NormalizeCloneURL(git.URL)
 
 	var runtimeToken string
-	if keys := m.Edges.Apikeys; len(keys) > 0 {
+	// Mode local : on garde la base_url + api_key du modèle configuré par
+	// l'utilisateur (pas de LLMProxy interne). Le moteur local résout le
+	// modèle via settings.json (cf. pkg/taskflow/local/agent.go).
+	if keys := m.Edges.Apikeys; len(keys) > 0 && a.cfg.TaskFlow.Mode != "local" {
 		m.APIKey = keys[0].APIKey
 		m.BaseURL = a.cfg.LLMProxy.BaseURL + "/v1"
 		runtimeToken = keys[0].APIKey

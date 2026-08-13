@@ -88,6 +88,13 @@ func (c *Client) spawnAgent(ctx context.Context, rec *VM, resumeSession string) 
 		return fmt.Errorf("create engine dir: %w", err)
 	}
 
+	// Config LLM du moteur : settings.json (résolution par alias du modèle).
+	// La base_url + api_key sont celles du modèle configuré par l'utilisateur
+	// (pas de LLMProxy en mode local — le flux task.go les préserve).
+	if err := writeEngineSettings(engineDir, req.LLM, 200000, 32768); err != nil {
+		return fmt.Errorf("engine settings: %w", err)
+	}
+
 	bin := c.cfg.AgentBin
 	if bin == "" {
 		bin = "ohmyagent"
@@ -116,9 +123,9 @@ func (c *Client) spawnAgent(ctx context.Context, rec *VM, resumeSession string) 
 
 	// session/create
 	params := map[string]any{
-		"cwd":              rec.workspace,
-		"permission_mode":  c.cfg.PermissionMode,
-		"interactive":      true,
+		"cwd":             rec.workspace,
+		"permission_mode": c.cfg.PermissionMode,
+		"interactive":     true,
 	}
 	if c.cfg.PermissionMode == "" {
 		params["permission_mode"] = "yolo" // mode local : confiance
@@ -296,6 +303,9 @@ func (m *taskManager) Continue(ctx context.Context, req taskflow.TaskReq) error 
 	}
 	text := ""
 	if req.Task != nil {
+		// Task.Text est déjà le texte clair : le décodage du format frontend
+		// (b64(JSON{content: b64(texte)})) est fait dans parseUserInputData
+		// (biz/task/handler/v1/task.go) avant d'arriver ici.
 		text = req.Task.Text
 	}
 	rec.mu.Lock()

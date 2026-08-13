@@ -3,12 +3,12 @@ package local
 import (
 	"bufio"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -266,6 +266,66 @@ func (ac *agentClient) close() {
 func (ac *agentClient) wait() error { return ac.cmd.Wait() }
 
 // ============================================================================
+// settings.json — la config LLM que le moteur ohmyagent lit dans son
+// config dir (OHMYAGENT_CONFIG_DIR). Même mécanisme que le client desktop
+// (desktop/src/config.rs write_ohmyagent_config) : le moteur résout le
+// modèle passé à session/create par son alias dans settings.models.
+// ============================================================================
+
+// wireTypeOf mappe l'interface_type du modèle (champs backend) vers le
+// wire type attendu par le moteur ohmyagent.
+func wireTypeOf(interfaceType string) string {
+	switch interfaceType {
+	case "openai_responses":
+		return "openai-responses"
+	case "anthropic":
+		return "anthropic"
+	default:
+		return "openai-chat"
+	}
+}
+
+// writeEngineSettings écrit <engineDir>/settings.json avec le modèle de la
+// tâche (base_url + api_key + model) — le moteur s'en sert pour appeler le
+// fournisseur. Retourne une erreur si l'écriture échoue.
+func writeEngineSettings(engineDir string, llm taskflow.LLM, contextLimit, outputLimit int) error {
+	alias := llm.Model
+	if alias == "" {
+		return fmt.Errorf("engine settings: empty model id")
+	}
+	if contextLimit <= 0 {
+		contextLimit = 200000
+	}
+	if outputLimit <= 0 {
+		outputLimit = 32768
+	}
+	entry := map[string]any{
+		"type":            wireTypeOf(string(llm.ApiType)),
+		"model":           llm.Model,
+		"base_url":        llm.BaseURL,
+		"api_key":         llm.ApiKey,
+		"context_window":  contextLimit,
+		"supports_images": false,
+		"max_output":      outputLimit,
+		"thinking":        map[string]any{"enabled": true, "effort": "low"},
+	}
+	settings := map[string]any{
+		"default_model":   alias,
+		"permission_mode": "yolo",
+		"models":          map[string]any{alias: entry},
+	}
+	b, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("engine settings marshal: %w", err)
+	}
+	path := filepath.Join(engineDir, "settings.json")
+	if err := os.WriteFile(path, b, 0o600); err != nil {
+		return fmt.Errorf("engine settings write: %w", err)
+	}
+	return nil
+}
+
+// ============================================================================
 // Mapping moteur → TaskChunk (format ACP attendu par le frontend web).
 //
 // Le frontend (task-message-handler.ts) attend :
@@ -275,12 +335,16 @@ func (ac *agentClient) wait() error { return ac.cmd.Wait() }
 //   - {Event:"task-ended", Kind: status}
 // ============================================================================
 
-func b64json(v any) []byte {
+// rawJSON sérialise v en JSON brut. TaskChunk.Data est un []byte : le
+// transport WebSocket l'encode en base64, et le frontend (task-message-
+// handler.ts) fait b64decode(chunk.data) puis JSON.parse — donc Data doit
+// contenir le JSON brut, PAS du base64 (sinon double encodage).
+func rawJSON(v any) []byte {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return []byte{}
 	}
-	return []byte(base64.StdEncoding.EncodeToString(b))
+	return b
 }
 
 // acpUpdate construit un chunk ACP.
@@ -288,7 +352,7 @@ func acpUpdate(update any) *taskflow.TaskChunk {
 	return &taskflow.TaskChunk{
 		Event: "task-running",
 		Kind:  "acp_event",
-		Data:  b64json(map[string]any{"update": update}),
+		Data:  rawJSON(map[string]any{"update": update}),
 	}
 }
 
@@ -377,7 +441,7 @@ func engineEventToChunk(ev engineEvent) []*taskflow.TaskChunk {
 		}
 		return []*taskflow.TaskChunk{{
 			Event: "task-error",
-			Data:  b64json(map[string]any{"error": map[string]any{"message": msg}}),
+			Data:  rawJSON(map[string]any{"error": map[string]any{"message": msg}}),
 		}}
 	default:
 		// complete / interrupted / max_turns / usage / todo_update /

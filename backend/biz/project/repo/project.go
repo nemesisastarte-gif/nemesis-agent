@@ -165,9 +165,8 @@ func (r *ProjectRepo) Update(ctx context.Context, u *domain.User, req *domain.Up
 	}
 
 	err = entx.WithTx2(ctx, r.db, func(tx *db.Tx) error {
-		p, err := tx.Project.Query().
-			Where(project.ID(req.ID), r.getProjectQuery(u.ID)).
-			ForUpdate().
+		p, err := entx.WithForUpdate(tx.Project.Query().
+			Where(project.ID(req.ID), r.getProjectQuery(u.ID))).
 			First(ctx)
 		if err != nil {
 			if db.IsNotFound(err) {
@@ -176,9 +175,8 @@ func (r *ProjectRepo) Update(ctx context.Context, u *domain.User, req *domain.Up
 			return errcode.ErrDatabaseOperation.Wrap(err)
 		}
 
-		coo, err := tx.ProjectCollaborator.Query().
-			Where(projectcollaborator.ProjectIDEQ(req.ID), projectcollaborator.UserIDEQ(u.ID)).
-			ForUpdate().
+		coo, err := entx.WithForUpdate(tx.ProjectCollaborator.Query().
+			Where(projectcollaborator.ProjectIDEQ(req.ID), projectcollaborator.UserIDEQ(u.ID))).
 			First(ctx)
 		if err != nil {
 			if db.IsNotFound(err) {

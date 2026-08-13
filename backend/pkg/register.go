@@ -2,6 +2,8 @@ package pkg
 
 import (
 	"context"
+	"net"
+	"strings"
 	"log/slog"
 
 	"github.com/GoYoko/web"
@@ -141,7 +143,8 @@ func RegisterInfra(i *do.Injector, w ...*web.Web) error {
 		// Mode local : la machine hôte est l'environnement de développement.
 		// Aucun service taskflow/rustfs requis (voir docs/local-mode-design.md).
 		if cfg.TaskFlow.Mode == "local" {
-			return local.NewClient(cfg.TaskFlow.Local, l)
+			return local.NewClient(cfg.TaskFlow.Local, l,
+				local.WithInternalBaseURL(localInternalBaseURL(cfg.Server.Addr)))
 		}
 		return taskflow.NewClient(taskflow.WithDebug(cfg.Debug), taskflow.WithLogger(l)), nil
 	})
@@ -332,4 +335,27 @@ func RegisterInfra(i *do.Injector, w ...*web.Web) error {
 	})
 
 	return nil
+}
+
+// localInternalBaseURL construit l'URL de base du serveur local pour les
+// callbacks internes (/internal/vm-ready). Accepte ":8888", "127.0.0.1:8888",
+// "[::]:8888" → http://127.0.0.1:<port>.
+func localInternalBaseURL(addr string) string {
+	host := "127.0.0.1"
+	port := "8888"
+	trimmed := strings.TrimSpace(addr)
+	trimmed = strings.TrimPrefix(trimmed, ":")
+	if h, p, err := net.SplitHostPort(addr); err == nil && p != "" {
+		port = p
+		host = h
+		if host == "" || host == "::" || host == "[::]" {
+			host = "127.0.0.1"
+		}
+	} else if trimmed != "" && !strings.Contains(trimmed, ":") {
+		port = trimmed
+	}
+	if port == "" {
+		port = "8888"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }

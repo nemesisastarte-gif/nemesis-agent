@@ -1,8 +1,11 @@
 package local
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,7 +74,60 @@ func (m *vmManager) Create(ctx context.Context, req *taskflow.CreateVirtualMachi
 	m.c.mu.Unlock()
 
 	m.c.logger.InfoContext(ctx, "local vm created", "vm_id", vmID, "workspace", ws)
+
+	// Callback vm-ready : même chemin que taskflow en cloud — transitionne les
+	// tâches pending → processing, ce qui déclenche le lancement du moteur
+	// (pkg/lifecycle/taskhook.go handleProcessing). Async : ne bloque pas la
+	// création de la tâche.
+	go m.c.notifyVMReady(vm)
 	return vm, nil
+}
+
+// notifyVMReady appelle POST /internal/vm-ready (route interne sans auth,
+// même contrat que le callback taskflow) pour signaler que la VM locale est
+// prête. Retry : le callback part en asynchrone pendant la création de la
+// tâche, alors que la machine à états (Redis) n'a pas encore enregistré la
+// transition "" → pending — la première tentative peut donc échouer. Les
+// appels suivants sont idempotents (ignorés une fois la tâche processing).
+func (c *Client) notifyVMReady(vm *taskflow.VirtualMachine) {
+	if c.internalBaseURL == "" {
+		return
+	}
+	b, err := json.Marshal(vm)
+	if err != nil {
+		c.logger.Warn("vm-ready marshal failed", "error", err)
+		return
+	}
+
+	const attempts = 15
+	const interval = 500 * time.Millisecond
+	for i := 1; i <= attempts; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+			c.internalBaseURL+"/internal/vm-ready", bytes.NewReader(b))
+		if err != nil {
+			cancel()
+			c.logger.Warn("vm-ready request build failed", "error", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			c.logger.Warn("vm-ready callback failed", "vm_id", vm.ID, "error", err, "attempt", i)
+		} else {
+			_ = resp.Body.Close()
+			if resp.StatusCode < 300 {
+				c.logger.Info("vm-ready callback ok", "vm_id", vm.ID, "attempt", i)
+				return
+			}
+			c.logger.Warn("vm-ready callback non-2xx", "vm_id", vm.ID, "status", resp.StatusCode, "attempt", i)
+		}
+		if i < attempts {
+			time.Sleep(interval)
+		}
+	}
+	c.logger.Error("vm-ready callback gave up", "vm_id", vm.ID, "attempts", attempts)
 }
 
 // cloneRepo clone le repo (avec éventuellement le token) dans le workspace.

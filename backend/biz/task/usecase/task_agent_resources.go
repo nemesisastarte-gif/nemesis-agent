@@ -63,7 +63,7 @@ func (a *TaskUsecase) SwitchAgentResources(ctx context.Context, user *domain.Use
 	if err != nil {
 		return nil, err
 	}
-	if runtimeKey != "" {
+	if runtimeKey != "" && a.cfg.TaskFlow.Mode != "local" {
 		model.APIKey = runtimeKey
 		if a.cfg != nil {
 			model.BaseURL = a.cfg.LLMProxy.BaseURL + "/v1"
