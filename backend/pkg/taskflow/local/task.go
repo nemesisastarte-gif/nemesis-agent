@@ -1,7 +1,6 @@
 package local
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/teteekoue/NemesisCode/backend/pkg/taskflow"
 )
@@ -21,12 +21,20 @@ type taskManager struct{ c *Client }
 
 var _ taskflow.TaskManager = (*taskManager)(nil)
 
-// Create 持久化 la config de tâche dans le workspace puis lance le moteur
-// agent sur la machine hôte (contrat décrit dans docs/local-mode-design.md) :
+// engineDirFor retourne le répertoire privé du moteur pour une tâche :
+// <workspace>/.ohmyagent (config, sessions, logs du moteur).
+func engineDirFor(ws string) string {
+	return filepath.Join(ws, ".ohmyagent")
+}
+
+// Create prépare le workspace puis démarre le VRAI moteur ohmyagent :
 //
-//	$NEMESIS_AGENT_BIN --task-config <workspace>/nemesis-task.json
+//	$NEMESIS_AGENT_BIN --stdio            (JSON-RPC ligne par ligne)
+//	  env  OHMYAGENT_CONFIG_DIR=<workspace>/.ohmyagent
+//	  cwd  <workspace>/.ohmyagent
 //
-// env : NEMESIS_TASK_ID / NEMESIS_VM_ID / NEMESIS_WORKSPACE, cwd = workspace.
+// puis session/create {cwd: workspace, permission_mode, interactive, model}
+// et session/sendMessage {session_id, message: req.Text}.
 func (m *taskManager) Create(ctx context.Context, req taskflow.CreateTaskReq) error {
 	rec := m.c.getVM(req.VMID)
 	if rec == nil {
@@ -40,10 +48,11 @@ func (m *taskManager) Create(ctx context.Context, req taskflow.CreateTaskReq) er
 	if err := m.persistTaskConfig(rec); err != nil {
 		return err
 	}
-	return m.c.spawnAgent(ctx, rec)
+	return m.c.spawnAgent(ctx, rec, "")
 }
 
-// persistTaskConfig 把 lastReq 序列化到 workspace/nemesis-task.json.
+// persistTaskConfig sérialise la config de tâche dans le workspace
+// (référence pour l'utilisateur / débogage).
 func (m *taskManager) persistTaskConfig(rec *VM) error {
 	rec.mu.Lock()
 	req := rec.lastReq
@@ -62,8 +71,9 @@ func (m *taskManager) persistTaskConfig(rec *VM) error {
 	return nil
 }
 
-// spawnAgent 启动（或重启）agent 进程并接上输出流。
-func (c *Client) spawnAgent(ctx context.Context, rec *VM) error {
+// spawnAgent démarre le vrai moteur pour la tâche du workspace rec.
+// resumeSession != "" → session/create {resume: resumeSession}.
+func (c *Client) spawnAgent(ctx context.Context, rec *VM, resumeSession string) error {
 	c.stopAgent(rec)
 
 	rec.mu.Lock()
@@ -73,90 +83,176 @@ func (c *Client) spawnAgent(ctx context.Context, rec *VM) error {
 		return fmt.Errorf("no task config for vm %s", rec.record.ID)
 	}
 
-	cfgPath := filepath.Join(rec.workspace, taskConfigFile)
+	engineDir := engineDirFor(rec.workspace)
+	if err := os.MkdirAll(engineDir, 0o755); err != nil {
+		return fmt.Errorf("create engine dir: %w", err)
+	}
+
+	bin := c.cfg.AgentBin
+	if bin == "" {
+		bin = "ohmyagent"
+	}
 	args := append([]string{}, c.cfg.AgentArgs...)
 	if len(args) == 0 {
-		args = []string{"--task-config", cfgPath}
+		args = []string{"--stdio"}
 	}
 
-	// NB: on utilise exec.Command (pas CommandContext) : le ctx du hook de
-	// lifecycle peut être annulé dès que handleProcessing rend la main, ce qui
-	// tuerait l'agent. La fin de vie est gérée explicitement par stopAgent.
-	cmd := exec.Command(c.cfg.AgentBin, args...)
-	cmd.Dir = rec.workspace
-	cmd.Env = append(os.Environ(),
-		"NEMESIS_TASK_ID="+req.ID.String(),
-		"NEMESIS_VM_ID="+rec.record.ID,
-		"NEMESIS_WORKSPACE="+rec.workspace,
-	)
-
-	stdout, err := cmd.StdoutPipe()
+	// NB: exec.Command (pas CommandContext) — le ctx du hook lifecycle peut
+	// être annulé dès que handleProcessing rend la main. La fin de vie est
+	// gérée explicitement par stopAgent.
+	agent, err := startAgentProcess(bin, args, engineDir, []string{
+		"OHMYAGENT_CONFIG_DIR=" + engineDir,
+		"NEMESIS_TASK_ID=" + req.ID.String(),
+		"NEMESIS_VM_ID=" + rec.record.ID,
+		"NEMESIS_WORKSPACE=" + rec.workspace,
+	})
 	if err != nil {
-		return fmt.Errorf("agent stdout pipe: %w", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("agent stderr pipe: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("start agent %s: %w", c.cfg.AgentBin, err)
+		return err
 	}
 
 	rec.mu.Lock()
-	rec.proc = cmd.Process
+	rec.agent = agent
 	rec.mu.Unlock()
 
-	c.logger.InfoContext(ctx, "local agent started",
-		"task_id", req.ID.String(), "vm_id", rec.record.ID,
-		"bin", c.cfg.AgentBin, "workspace", rec.workspace)
+	// session/create
+	params := map[string]any{
+		"cwd":              rec.workspace,
+		"permission_mode":  c.cfg.PermissionMode,
+		"interactive":      true,
+	}
+	if c.cfg.PermissionMode == "" {
+		params["permission_mode"] = "yolo" // mode local : confiance
+	}
+	if resumeSession != "" {
+		params["resume"] = resumeSession
+	}
+	if req.LLM.Model != "" {
+		params["model"] = req.LLM.Model
+	}
+	resp, err := agent.call(ctx, "session/create", params)
+	if err != nil {
+		agent.close()
+		rec.mu.Lock()
+		rec.agent = nil
+		rec.mu.Unlock()
+		return fmt.Errorf("session/create: %w", err)
+	}
+	var created struct {
+		SessionID string `json:"session_id"`
+	}
+	_ = json.Unmarshal(resp, &created)
+	if created.SessionID == "" {
+		agent.close()
+		rec.mu.Lock()
+		rec.agent = nil
+		rec.mu.Unlock()
+		return fmt.Errorf("session/create: engine returned no session_id")
+	}
+	rec.mu.Lock()
+	rec.sessionID = created.SessionID
+	rec.mu.Unlock()
 
-	go c.pumpOutput(rec, stdout, "stdout")
-	go c.pumpOutput(rec, stderr, "stderr")
-	go c.waitAgent(rec, cmd)
+	c.logger.InfoContext(ctx, "local agent session created",
+		"task_id", req.ID.String(), "vm_id", rec.record.ID,
+		"session_id", created.SessionID, "model", req.LLM.Model)
+
+	// Démarrer la pompe notifications (publication LiveStream) puis envoyer
+	// la demande initiale.
+	go c.pumpAgentNotifications(rec, agent)
+	if req.Text != "" {
+		if err := c.sendAgentMessage(rec, req.Text); err != nil {
+			return fmt.Errorf("session/sendMessage: %w", err)
+		}
+	}
 	return nil
 }
 
-// pumpOutput 读进程输出：ligne JSON valide (event non vide) → chunk structuré
-// tel quel ; sinon → chunk brut Event "output" / Kind stdout|stderr.
-func (c *Client) pumpOutput(rec *VM, r io.Reader, kind string) {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
-	for sc.Scan() {
-		line := sc.Bytes()
-		var chunk taskflow.TaskChunk
-		if json.Unmarshal(line, &chunk) == nil && chunk.Event != "" {
-			rec.live.Publish(&chunk)
-			continue
+// pumpAgentNotifications lit les notifications du moteur et les publie dans
+// le LiveStream de la tâche (mapping ACP → TaskChunk).
+func (c *Client) pumpAgentNotifications(rec *VM, agent *agentClient) {
+	for {
+		select {
+		case <-agent.done:
+			return
+		case ev := <-agent.notif:
+			switch ev.Method {
+			case "event/stream":
+				for _, chunk := range engineEventToChunk(ev) {
+					rec.live.Publish(chunk)
+				}
+			case "permission/request":
+				// Mode local : auto-approve (confiance) — le moteur poursuit.
+				var p struct {
+					RequestID string `json:"request_id"`
+				}
+				_ = json.Unmarshal(ev.Params, &p)
+				if p.RequestID != "" {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					_, _ = agent.call(ctx, "permission/respond", map[string]any{
+						"request_id": p.RequestID,
+						"approved":   true,
+					})
+					cancel()
+				}
+			case "question/request":
+				// Question posée à l'utilisateur : v1 → répondre "annulé"
+				// (le frontend web question/answer n'est pas branché sur le
+				// moteur local pour l'instant).
+				var p struct {
+					RequestID string `json:"request_id"`
+				}
+				_ = json.Unmarshal(ev.Params, &p)
+				if p.RequestID != "" {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					_, _ = agent.call(ctx, "question/respond", map[string]any{
+						"request_id": p.RequestID,
+						"answers":    []any{},
+						"cancelled":  true,
+					})
+					cancel()
+				}
+			case "turn/stopped":
+				var p struct {
+					SessionID  string `json:"session_id"`
+					StopReason string `json:"stop_reason"`
+					Error      string `json:"error"`
+				}
+				_ = json.Unmarshal(ev.Params, &p)
+				kind := "success"
+				if p.Error != "" || p.StopReason == "error" {
+					kind = "failed"
+				}
+				rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: kind})
+				c.logger.Info("local agent turn stopped",
+					"session_id", p.SessionID, "stop_reason", p.StopReason)
+			default:
+				// permission/cancelled, question/cancelled, … : rien à publier
+			}
 		}
-		data := make([]byte, len(line)+1)
-		copy(data, line)
-		data[len(line)] = '\n'
-		rec.live.Publish(&taskflow.TaskChunk{
-			Event: "output",
-			Kind:  kind,
-			Data:  data,
-		})
 	}
 }
 
-// waitAgent 在进程退出时发布 task-ended 并清理 proc 引用。
-func (c *Client) waitAgent(rec *VM, cmd *exec.Cmd) {
-	waitErr := cmd.Wait()
-
-	status := "success"
-	if waitErr != nil {
-		status = "failed"
-	}
-
+// sendAgentMessage envoie un message utilisateur à la session active.
+func (c *Client) sendAgentMessage(rec *VM, text string) error {
 	rec.mu.Lock()
-	if rec.proc == cmd.Process {
-		rec.proc = nil
-	}
+	agent := rec.agent
+	sid := rec.sessionID
 	rec.mu.Unlock()
-
-	rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: status})
+	if agent == nil || sid == "" {
+		return fmt.Errorf("no active agent session")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), engineRPCTimeout)
+	defer cancel()
+	_, err := agent.call(ctx, "session/sendMessage", map[string]any{
+		"session_id": sid,
+		"message":    text,
+	})
+	return err
 }
+
+// ---------------------------------------------------------------------------
+// Contrôle des tâches
+// ---------------------------------------------------------------------------
 
 func (m *taskManager) taskVM(req taskflow.TaskReq) (*VM, error) {
 	if req.VirtualMachine == nil {
@@ -169,7 +265,7 @@ func (m *taskManager) taskVM(req taskflow.TaskReq) (*VM, error) {
 	return rec, nil
 }
 
-// Stop 停掉 agent 进程（SIGINT → SIGKILL 兜底）。
+// Stop arrête le moteur (destroy session + SIGINT).
 func (m *taskManager) Stop(ctx context.Context, req taskflow.TaskReq) error {
 	rec, err := m.taskVM(req)
 	if err != nil {
@@ -179,7 +275,7 @@ func (m *taskManager) Stop(ctx context.Context, req taskflow.TaskReq) error {
 	return nil
 }
 
-// Cancel 取消任务：SIGINT 优雅停止；若进程已不在，仅记录。
+// Cancel arrête le moteur et marque la fin (cancelled).
 func (m *taskManager) Cancel(ctx context.Context, req taskflow.TaskReq) error {
 	rec, err := m.taskVM(req)
 	if err != nil {
@@ -191,61 +287,97 @@ func (m *taskManager) Cancel(ctx context.Context, req taskflow.TaskReq) error {
 	return nil
 }
 
-// Continue 续跑：若 agent 进程已退出，用同样的 config 重新拉起。
-// 若请求携带了新的任务文本（Task.Text），先把它写进 config 再重启。
+// Continue envoie un nouveau message à la session active ; si le moteur est
+// sorti, relance la session (resume).
 func (m *taskManager) Continue(ctx context.Context, req taskflow.TaskReq) error {
 	rec, err := m.taskVM(req)
 	if err != nil {
 		return err
 	}
+	text := ""
+	if req.Task != nil {
+		text = req.Task.Text
+	}
 	rec.mu.Lock()
-	running := rec.proc != nil
-	if !running && req.Task != nil && req.Task.Text != "" && rec.lastReq != nil {
-		rec.lastReq.Text = req.Task.Text
-	}
+	agent := rec.agent
+	sid := rec.sessionID
 	rec.mu.Unlock()
-	if running {
-		return nil
+
+	if agent != nil && sid != "" {
+		if text == "" {
+			return nil
+		}
+		return m.c.sendAgentMessage(rec, text)
 	}
-	if err := m.persistTaskConfig(rec); err != nil {
-		return err
+	// Session morte → relancer avec resume.
+	if text != "" && rec.lastReq != nil {
+		rec.mu.Lock()
+		rec.lastReq.Text = text
+		rec.mu.Unlock()
+		_ = m.persistTaskConfig(rec)
 	}
-	return m.c.spawnAgent(ctx, rec)
+	return m.c.spawnAgent(ctx, rec, sid)
 }
 
-// Restart 重启任务：停掉旧进程再拉起（req.ID est l'UUID de la tâche).
+// Restart relance le moteur (resume de la session si possible).
 func (m *taskManager) Restart(ctx context.Context, req taskflow.RestartTaskReq) (*taskflow.RestartTaskResp, error) {
 	rec := m.c.getVMByTask(req.ID.String())
 	if rec == nil {
 		return nil, fmt.Errorf("environment not found: %s", req.ID)
 	}
-	if err := m.c.spawnAgent(ctx, rec); err != nil {
+	rec.mu.Lock()
+	sid := rec.sessionID
+	rec.mu.Unlock()
+	if err := m.c.spawnAgent(ctx, rec, sid); err != nil {
 		return &taskflow.RestartTaskResp{
 			ID: req.ID, RequestId: req.RequestId, Success: false, Message: err.Error(),
 		}, nil
 	}
 	return &taskflow.RestartTaskResp{
-		ID: req.ID, RequestId: req.RequestId, Success: true, SessionID: req.RequestId,
+		ID: req.ID, RequestId: req.RequestId, Success: true, SessionID: sid,
 	}, nil
 }
 
-// AutoApprove 记录批准状态（v1 : journalisation, pas encore transmis au moteur).
+// AutoApprove : le mode local auto-approuve (permission_mode=yolo) — no-op.
 func (m *taskManager) AutoApprove(ctx context.Context, req taskflow.TaskApproveReq) error {
-	m.c.logger.InfoContext(ctx, "local auto-approve (logged only)",
-		"task_id", req.ID.String(), "auto_approve", req.AutoApprove)
 	return nil
 }
 
-// AskUserQuestion 记录用户对 agent 提问的答复（v1 : journalisation).
+// AskUserQuestion : réponse utilisateur aux questions du moteur.
+// v1 : si la session est active, on relaie via question/respond.
 func (m *taskManager) AskUserQuestion(ctx context.Context, req taskflow.AskUserQuestionResponse) error {
-	m.c.logger.InfoContext(ctx, "local ask-user-question (logged only)",
-		"task_id", req.TaskId, "request_id", req.RequestId, "cancelled", req.Cancelled)
-	return nil
+	rec := m.c.getVMByTask(req.TaskId)
+	if rec == nil {
+		return fmt.Errorf("environment not found: %s", req.TaskId)
+	}
+	rec.mu.Lock()
+	agent := rec.agent
+	rec.mu.Unlock()
+	if agent == nil {
+		return nil
+	}
+	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	_, err := agent.call(ctx2, "question/respond", map[string]any{
+		"request_id": req.RequestId,
+		"answers":    parseAnswersJSON(req.AnswersJson),
+		"cancelled":  req.Cancelled,
+	})
+	return err
 }
 
-// ---- repo 操作（FS 本机 + git）----
+func parseAnswersJSON(s string) []any {
+	var out []any
+	if s != "" {
+		_ = json.Unmarshal([]byte(s), &out)
+	}
+	return out
+}
 
-// workspacePath 把请求里的相对路径解析到 workspace 内（防 traversée).
+// ---------------------------------------------------------------------------
+// Opérations repo (FS local + git) — inchangées
+// ---------------------------------------------------------------------------
+
 func (m *taskManager) workspacePath(rec *VM, p string) (string, error) {
 	base, err := filepath.Abs(rec.workspace)
 	if err != nil {
@@ -387,7 +519,6 @@ func (m *taskManager) FileChanges(ctx context.Context, req taskflow.RepoFileChan
 			Status: status,
 		})
 	}
-	// branch + commit hash courants
 	branch, _ := gitOutput(rec.workspace, "rev-parse", "--abbrev-ref", "HEAD")
 	commit, _ := gitOutput(rec.workspace, "rev-parse", "HEAD")
 	return &taskflow.RepoFileChanges{
@@ -407,7 +538,6 @@ func gitOutput(dir string, args ...string) (string, error) {
 }
 
 func isGitNoChanges(err error) bool {
-	// git diff 无变更时 exit code 1
 	var ee *exec.ExitError
 	if errors.As(err, &ee) {
 		return ee.ExitCode() == 1

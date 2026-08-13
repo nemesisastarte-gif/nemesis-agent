@@ -39,8 +39,9 @@ default_env() {
   export MCAI_OBJECT_STORAGE_ENABLED="${MCAI_OBJECT_STORAGE_ENABLED:-true}"
   export MCAI_OBJECT_STORAGE_PROVIDER="${MCAI_OBJECT_STORAGE_PROVIDER:-local}"
   export MCAI_OBJECT_STORAGE_LOCAL_DIR="${MCAI_OBJECT_STORAGE_LOCAL_DIR:-$RUNTIME_DIR/uploads}"
-  # L'agent local (moteur ohmyagent) — adapter selon votre installation.
+  # Le vrai moteur ohmyagent (binaire fourni séparément — protocole --stdio).
   export MCAI_TASKFLOW_LOCAL_AGENT_BIN="${MCAI_TASKFLOW_LOCAL_AGENT_BIN:-ohmyagent}"
+  export MCAI_TASKFLOW_LOCAL_PERMISSION_MODE="${MCAI_TASKFLOW_LOCAL_PERMISSION_MODE:-yolo}"
 }
 
 is_running() {

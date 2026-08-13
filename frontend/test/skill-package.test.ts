@@ -5,7 +5,7 @@ import {
   findSkillMarkdownPath,
   normalizeSkillTags,
   parseSkillMarkdown,
-} from "../src/components/manager/skill-package.ts";
+} from "../src/components/manager/skill-package-core.ts";
 
 const skillMarkdown = `---
 name: 设计系统模式

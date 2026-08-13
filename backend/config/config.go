@@ -194,6 +194,9 @@ type LocalTaskFlow struct {
 	AgentArgs []string `mapstructure:"agent_args"`
 	// Shell 终端 shell（默认 $SHELL，兜底 /bin/sh）。
 	Shell string `mapstructure:"shell"`
+	// PermissionMode mode de permission du moteur ohmyagent
+	// (default/plan/auto/bypassPermissions/yolo). Vide → "yolo" (local = confiance).
+	PermissionMode string `mapstructure:"permission_mode"`
 	// HostID 本机在宿主列表中的 ID（默认 local-<hostname>）。
 	HostID string `mapstructure:"host_id"`
 	// HostName 宿主机显示名（默认主机名）。
@@ -415,6 +418,7 @@ func Init(dir string) (*Config, error) {
 	v.SetDefault("taskflow.local.agent_bin", "ohmyagent")
 	v.SetDefault("taskflow.local.agent_args", []string{})
 	v.SetDefault("taskflow.local.shell", "")
+	v.SetDefault("taskflow.local.permission_mode", "yolo")
 	v.SetDefault("taskflow.local.host_id", "")
 	v.SetDefault("taskflow.local.host_name", "")
 	v.SetDefault("taskflow.local.keep_workspace_on_delete", false)

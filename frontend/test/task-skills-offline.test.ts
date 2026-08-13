@@ -19,20 +19,12 @@ test("任务输入框在 offline 模式下也加载并展示 Skills", () => {
 });
 
 test("默认任务弹窗在 offline 模式下也加载并展示 Skills", () => {
-  const loadEffectMatch = defaultTaskDialogSource.match(
-    /useEffect\(\(\) => \{[\s\S]*?\}, \[open, skillList, skillList\.length, t\]\)/,
-  );
-  assert.ok(loadEffectMatch, "default task dialog should have resource-loading effect");
-
-  const loadEffectSource = loadEffectMatch[0];
-  const skillRequestIndex = loadEffectSource.indexOf("v1SkillsList");
-  const offlineReturnIndex = loadEffectSource.indexOf("if (IS_OFFLINE_EDITION)");
-
-  assert.ok(skillRequestIndex >= 0, "default task dialog should request Skills");
-  assert.ok(
-    offlineReturnIndex === -1 || skillRequestIndex < offlineReturnIndex,
-    "offline guard should not skip loading Skills",
-  );
+  // Le dialogue charge les Skills via apiRequest dans un useEffect (dépendances
+  // actuelles : open, skillList, skillsLoaded, t) — sans garde offline.
+  assert.match(defaultTaskDialogSource, /useEffect\(\(\) => \{/);
+  assert.match(defaultTaskDialogSource, /apiRequest\("v1SkillsList"/);
+  assert.match(defaultTaskDialogSource, /\[open, skillList, skillsLoaded, t\]\)/);
+  assert.doesNotMatch(defaultTaskDialogSource, /if \(IS_OFFLINE_EDITION\)/);
   assert.doesNotMatch(defaultTaskDialogSource, /\{!IS_OFFLINE_EDITION && \(\s*<TaskSkillSelector/);
   assert.match(defaultTaskDialogSource, /filterSelectableSkillIds\(prev, skills\)/);
   assert.match(defaultTaskDialogSource, /filterSelectableSkillIds\(defaultSkills, skillList\)/);

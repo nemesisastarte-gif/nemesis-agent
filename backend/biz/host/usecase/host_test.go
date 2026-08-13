@@ -510,6 +510,10 @@ type hostTaskRepoStub struct {
 func (s *hostTaskRepoStub) GetByID(ctx context.Context, id uuid.UUID) (*db.Task, error) {
 	return s.client.Task.Get(ctx, id)
 }
+func (s *hostTaskRepoStub) UpdateAgentResourceSelection(ctx context.Context, taskID uuid.UUID, skillIDs, pluginIDs []string) error {
+	return nil
+}
+
 
 func (s *hostTaskRepoStub) GetLogStore(ctx context.Context, id uuid.UUID) (consts.LogStore, error) {
 	tk, err := s.client.Task.Get(ctx, id)

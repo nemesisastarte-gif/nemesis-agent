@@ -30,8 +30,10 @@ test("remaining runtime messages are wired through i18n", () => {
   for (const file of [
     "utils/requestUtils.ts",
     "lib/agent-resources-api.ts",
-    "components/manager/skill-package.ts",
   ]) {
     assert.match(readSource(file), /@\/i18n/, file)
   }
+  // skill-package.ts : depuis le refactor, les fonctions pures vivent dans
+  // skill-package-core.ts (sans i18n) — plus de message runtime ici.
+  assert.doesNotMatch(readSource("components/manager/skill-package.ts"), /@\/i18n/)
 })

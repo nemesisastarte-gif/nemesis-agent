@@ -151,9 +151,11 @@ Variables utiles du mode local (préfixe `MCAI_`) :
 | `MCAI_TASKFLOW_LOCAL_SHELL` | `$SHELL` | shell des terminaux web |
 | `MCAI_TASKFLOW_LOCAL_HOST_ID` | `local-<hostname>` | identifiant de l'hôte local |
 
-> ⚠️ Le moteur agent (`ohmyagent`) vit dans le sous-module `agent/`
-> (dépôt privé upstream). Sans lui, le backend fonctionne mais les tâches ne
-> peuvent pas démarrer. Design détaillé : [docs/local-mode-design.md](./docs/local-mode-design.md).
+> ⚠️ Le moteur agent (`ohmyagent`, protocole `--stdio` JSON-RPC) doit être
+> installé sur la machine hôte (binaire fourni séparément — sous-module
+> `agent/`, dépôt `chaitin/OhMyAgent`). Sans lui, le backend fonctionne mais
+> les tâches ne peuvent pas démarrer. Design détaillé :
+> [docs/local-mode-design.md](./docs/local-mode-design.md).
 
 ### Option B — Déploiement complet (docker-compose)
 

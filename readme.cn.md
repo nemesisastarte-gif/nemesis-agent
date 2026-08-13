@@ -5,16 +5,15 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/teteekoue/NemesisCode/actions/workflows/build.yml"><img src="https://github.com/teteekoue/NemesisCode/actions/workflows/build.yml/badge.svg" alt="Service Images" /></a>
-  <a href="https://github.com/teteekoue/NemesisCode/actions/workflows/electron-release.yml"><img src="https://github.com/teteekoue/NemesisCode/actions/workflows/electron-release.yml/badge.svg" alt="Client Release" /></a>
+  <a href="https://github.com/nemesisastarte-gif/nemesis-agent/actions/workflows/build.yml"><img src="https://github.com/nemesisastarte-gif/nemesis-agent/actions/workflows/build.yml/badge.svg" alt="Service Images" /></a>
+  <a href="https://github.com/nemesisastarte-gif/nemesis-agent/actions/workflows/electron-release.yml"><img src="https://github.com/nemesisastarte-gif/nemesis-agent/actions/workflows/electron-release.yml/badge.svg" alt="Client Release" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0" /></a>
 </p>
 
 <p align="center">
-  <a href="https://monkeycode-ai.com/">在线使用</a> ·
-  <a href="https://showcase.monkeycode-ai.online/">用户作品集</a> ·
+  <a href="#本地模式">本地模式</a> ·
   <a href="#独立部署使用">独立部署</a> ·
-  <a href="https://baizhi.cloud/consult">企业咨询</a>
+  <a href="https://github.com/nemesisastarte-gif/nemesis-agent">GitHub</a>
 </p>
 
 ## NemesisCode 是什么
@@ -70,7 +69,7 @@ NemesisCode 是一款开源的**企业级 AI 开发平台**，内置了开发环
 
 直接访问 NemesisCode 在线版即可开始使用：
 
-[https://monkeycode-ai.com/](https://monkeycode-ai.com/)
+本仓库为 **NemesisCode**（MonkeyCode 的本地优先分支）：将后端运行在你的机器上，这台机器就是 Agent 的开发环境（SQLite + 内置 Redis，无需云服务）。
 
 ### 独立部署使用
 
@@ -82,10 +81,10 @@ NemesisCode 是一款开源的**企业级 AI 开发平台**，内置了开发环
 联网安装：
 
 ```bash
-bash -c "$(curl -fsSL 'https://monkeycode-ai.com/online/install')"
+bash -c "$(curl -fsSL 'https://github.com/nemesisastarte-gif/nemesis-agent')"
 ```
 
-更多部署方式、配置说明和运维建议，请参考[详细文档](https://monkeycode.docs.baizhi.cloud/node/019eb0f3-9424-7c93-9489-4e584f989527)：
+更多部署方式、配置说明和运维建议，请参考[详细文档](https://github.com/nemesisastarte-gif/nemesis-agent)：
 
 ## 同类项目对比
 
@@ -117,15 +116,12 @@ bash -c "$(curl -fsSL 'https://monkeycode-ai.com/online/install')"
 
 你也可以通过以下入口获取支持：
 
-- 使用文档：[https://monkeycode.docs.baizhi.cloud/](https://monkeycode.docs.baizhi.cloud/)
-- 在线使用：[https://monkeycode-ai.com/](https://monkeycode-ai.com/)
-- 企业咨询：[https://baizhi.cloud/consult](https://baizhi.cloud/consult)
-- Discord：[https://discord.gg/2pPmuyr4pP](https://discord.gg/2pPmuyr4pP)
-- GitHub Issues：[https://github.com/teteekoue/NemesisCode/issues](https://github.com/teteekoue/NemesisCode/issues)
+- GitHub：[https://github.com/nemesisastarte-gif/nemesis-agent](https://github.com/nemesisastarte-gif/nemesis-agent)
+- 本地模式说明：[docs/local-mode-design.md](./docs/local-mode-design.md)
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=teteekoue/NemesisCode&type=Date)](https://star-history.com/#teteekoue/NemesisCode&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=nemesisastarte-gif/nemesis-agent&type=Date)](https://star-history.com/#nemesisastarte-gif/nemesis-agent&Date)
 
 ## License
 

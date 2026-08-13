@@ -74,26 +74,50 @@ identiques.
 | Hibernate/Resume | marqueurs d'état (pas de vraie suspension) |
 | Hôte | la machine elle-même (`runtime.NumCPU`, hostname, GOOS/GOARCH) |
 
-## Contrat agent (v1)
+## Contrat agent — le VRAI moteur ohmyagent (protocole --stdio)
 
-Le protocole exact du moteur `ohmyagent` (dépôt privé) n'est pas encore aligné.
-Le mode local définit un contrat minimal, volontairement simple, à faire
-évoluer quand le moteur sera intégré :
+Le mode local pilote le **vrai moteur** `ohmyagent` (sous-module `agent/`,
+dépôt `chaitin/OhMyAgent`) via son protocole natif : **JSON-RPC 2.0 ligne par
+ligne** sur stdin/stdout, lancé avec `ohmyagent --stdio`. C'est exactement le
+protocole que le client desktop (Rust) utilise (référence :
+`desktop/src/driver/` — transport.rs / normalize.rs).
 
-1. Le backend écrit la tâche dans `<workspace>/nemesis-task.json`
-   (JSON = `taskflow.CreateTaskReq`).
-2. Il lance : `$NEMESIS_AGENT_BIN --task-config <workspace>/nemesis-task.json`
-   avec `cwd = <workspace>` et l'environnement suivant :
-   - `NEMESIS_TASK_ID=<uuid>`
-   - `NEMESIS_VM_ID=<vm_id>`
-   - `NEMESIS_WORKSPACE=<workspace>`
-3. Le processus écrit sur **stdout** soit :
-   - des octets bruts (sortie console) → émis en `Event: "output", Kind: "stdout"`,
-   - des **lignes JSON** `{"event": "...", "kind": "...", "data": "...", "seq": N}`
-     → émises telles quelles (ex. `task-event`, `task-ended`, `agent-message`).
-4. stderr → `Event: "output", Kind: "stderr"`.
-5. À la sortie du processus → `Event: "task-ended"` (status `success` si
-   exit code 0, `failed` sinon, via `Kind`).
+1. Le backend lance :
+   ```
+   $NEMESIS_AGENT_BIN --stdio
+     cwd  <workspace>/.ohmyagent
+     env  OHMYAGENT_CONFIG_DIR=<workspace>/.ohmyagent
+          NEMESIS_TASK_ID / NEMESIS_VM_ID / NEMESIS_WORKSPACE
+   ```
+   (le fichier `nemesis-task.json` reste écrit dans le workspace comme
+   référence/débogage, mais n'est pas le contrat).
+
+2. Handshake : le moteur émet `system/ready`
+   `{protocolVersion: "1.0", version, capabilities, shutdownGraceMs}` —
+   le backend vérifie `protocolVersion == "1.0"`.
+
+3. Sessions :
+   - `session/create` `{cwd: <workspace>, permission_mode, interactive: true,
+     model: <model-id>}` → `{session_id}`
+   - `session/sendMessage` `{session_id, message: <texte de la tâche>}`
+   - `session/destroy`, `session/compact`, `session/exists`
+
+4. Notifications reçues (moteur → backend) et mappées en TaskChunk :
+   | Notification | Mapping TaskChunk |
+   |---|---|
+   | `event/stream` `model_delta` | `task-running` / `acp_event` / ACP `agent_message_chunk` |
+   | `event/stream` `thinking_delta` | ACP `agent_thought_chunk` |
+   | `event/stream` `tool_call` | ACP `tool_call` (in_progress) |
+   | `event/stream` `tool_result` | ACP `tool_call_update` |
+   | `event/stream` `error` | `task-error` (sauf `transient_retry`) |
+   | `permission/request` | auto-approuvé (mode local, `permission_mode=yolo`) |
+   | `question/request` | répondu `cancelled` (v1) |
+   | `turn/stopped` | `task-ended` (`success` / `failed`) |
+
+   Le Data des chunks ACP est `base64(JSON {update: {sessionUpdate: ...}})`
+   — le format exact attendu par le frontend web (`task-message-handler.ts`).
+
+5. Arrêt : `session/destroy` puis SIGINT (SIGKILL après 3 s si nécessaire).
 
 ## Configuration
 
@@ -140,9 +164,12 @@ démarrage (`pkg/localhost.EnsureHost`, appelé depuis `cmd/server/main.go`) :
    rustfs/S3 requis.
 3. **✅ Étape 3 (faite)** : `scripts/nemesis-local.sh` (start/stop/status/logs)
    + `docs/local-setup.md` (installation Termux/Linux).
-4. **Étape 4** : aligner le contrat agent sur le vrai moteur `ohmyagent`
-   (protocole frame JSON-RPC) et brancher les vrais événements
-   (`task-event`, permissions, questions).
+4. **✅ Étape 4 (faite)** : le mode local pilote le vrai moteur `ohmyagent`
+   via son protocole natif `--stdio` (JSON-RPC ligne par ligne) : handshake
+   `system/ready`, `session/create` + `session/sendMessage`, notifications
+   `event/stream` mappées en chunks ACP, auto-approve des permissions,
+   `turn/stopped` → `task-ended`. Le binaire `ohmyagent` reste à fournir
+   (boutique privée / build du dépôt `chaitin/OhMyAgent`).
 
 ## Limites connues (v1)
 

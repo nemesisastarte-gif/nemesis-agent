@@ -29,7 +29,10 @@ type VM struct {
 	userID    string
 	workspace string
 	repoURL   string
-	proc      *os.Process
+	// agent : client JSON-RPC du vrai moteur ohmyagent (--stdio).
+	agent *agentClient
+	// sessionID : session moteur active (session/create).
+	sessionID string
 	live      *LiveStream
 	shells    map[string]*Shell
 	ports     map[string]*taskflow.PortForwardInfo
@@ -126,7 +129,7 @@ func (c *Client) Stats(ctx context.Context) (*taskflow.Stats, error) {
 		if vm.record.Status == taskflow.VirtualMachineStatusOnline {
 			st.OnlineVMCount++
 		}
-		if vm.proc != nil {
+		if vm.agent != nil {
 			st.OnlineTaskCount++
 		}
 		vm.mu.Unlock()
@@ -184,21 +187,25 @@ func (c *Client) getVMByTask(taskID string) *VM {
 	return nil
 }
 
-// stopAgent 停止 agent 进程（SIGINT 优雅，2s 后 SIGKILL）。
+// stopAgent 停止 agent 进程（destroy 会话 + SIGINT 优雅，3s 后 SIGKILL）。
 // 返回是否确实有进程在跑。
 func (c *Client) stopAgent(rec *VM) bool {
 	rec.mu.Lock()
-	p := rec.proc
-	rec.proc = nil
+	ag := rec.agent
+	rec.agent = nil
+	sid := rec.sessionID
+	rec.sessionID = ""
 	rec.mu.Unlock()
-	if p == nil {
+	if ag == nil {
 		return false
 	}
-	_ = p.Signal(os.Interrupt)
-	go func() {
-		time.Sleep(2 * time.Second)
-		_ = p.Kill()
-	}()
+	// destroy 会话 d'abord (grace), puis SIGINT.
+	if sid != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, _ = ag.call(ctx, "session/destroy", map[string]any{"session_id": sid})
+		cancel()
+	}
+	ag.close()
 	return true
 }
 
