@@ -28,3 +28,5 @@ dist
 # ai
 .superpowers/
 desktop/uidist/
+dist-deb/
+.local-runtime/
