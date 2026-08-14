@@ -94,7 +94,22 @@ MonkeyCode, elle réunit dans une même interface :
 
 ## Démarrage rapide
 
-### Option A — Mode local (recommandé pour un usage personnel)
+### Option A — paquet Debian tout-en-un (recommandé)
+
+Le paquet stable est publié dans **GitHub Releases**, pas dans l'historique Git :
+
+```bash
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/releases/latest/download/nemesiscode_1.2.0_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/releases/latest/download/SHA256SUMS
+sha256sum -c SHA256SUMS
+sudo dpkg -i nemesiscode_1.2.0_amd64.deb
+nemesiscode on       # → http://localhost:5000 (Admin / Admin)
+```
+
+Le backend statique, le frontend et le moteur opencode baseline sont inclus.
+Voir [docs/deb-package.md](./docs/deb-package.md).
+
+### Option B — Mode local depuis les sources
 
 Prérequis : Go 1.25+, Node 22+, pnpm. **Aucun service externe requis** : base
 SQLite + Redis en mémoire intégrés.
@@ -151,13 +166,12 @@ Variables utiles du mode local (préfixe `MCAI_`) :
 | `MCAI_TASKFLOW_LOCAL_SHELL` | `$SHELL` | shell des terminaux web |
 | `MCAI_TASKFLOW_LOCAL_HOST_ID` | `local-<hostname>` | identifiant de l'hôte local |
 
-> ⚠️ Le moteur agent (`ohmyagent`, protocole `--stdio` JSON-RPC) doit être
-> installé sur la machine hôte (binaire fourni séparément — sous-module
-> `agent/`, dépôt `chaitin/OhMyAgent`). Sans lui, le backend fonctionne mais
-> les tâches ne peuvent pas démarrer. Design détaillé :
+> Le paquet `.deb` embarque opencode baseline. Pour un lancement depuis les
+> sources, installez `opencode` dans le `PATH` ou définissez
+> `MCAI_TASKFLOW_LOCAL_AGENT_BIN`. Design détaillé :
 > [docs/local-mode-design.md](./docs/local-mode-design.md).
 
-### Option B — Déploiement complet (docker-compose)
+### Option C — Déploiement complet (docker-compose)
 
 L'architecture historique complète (backend, base de données, redis,
 clickhouse, rustfs, ingress, frontend) peut être déployée avec le

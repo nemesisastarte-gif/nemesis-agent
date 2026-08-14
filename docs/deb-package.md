@@ -9,9 +9,15 @@ tourner NemesisCode sur un PC Linux 64 bits, **sans rien installer d'autre** :
 - base de données SQLite (fichier), Redis intégré en mémoire, stockage
   fichier local — **aucun service externe**.
 
-## Installation
+## Téléchargement et installation
+
+Les paquets compilés sont stockés dans **GitHub Releases** afin de ne pas
+alourdir l'historique Git du code source :
 
 ```bash
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/releases/latest/download/nemesiscode_1.2.0_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/releases/latest/download/SHA256SUMS
+sha256sum -c SHA256SUMS
 sudo dpkg -i nemesiscode_1.2.0_amd64.deb
 ```
 

@@ -12,13 +12,16 @@ dépendance glibc, SQLite 100% Go), frontend compilé servi par le backend,
 Redis intégré. **Aucune installation supplémentaire.**
 
 ```bash
-sudo dpkg -i nemesiscode_1.0.0_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/releases/latest/download/nemesiscode_1.2.0_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/releases/latest/download/SHA256SUMS
+sha256sum -c SHA256SUMS
+sudo dpkg -i nemesiscode_1.2.0_amd64.deb
 nemesiscode on       # → http://localhost:5000  (Admin / Admin)
 nemesiscode off      # arrêt
 ```
 
 Voir [docs/deb-package.md](./deb-package.md) pour tous les détails
-(moteur ohmyagent, port, désinstallation, reconstruction).
+(moteur opencode embarqué, port, désinstallation, reconstruction).
 
 ## Prérequis
 
@@ -168,11 +171,11 @@ EXPO_PUBLIC_API_URL=http://192.168.1.10:8888 npx expo run:android
 
 ## Limites du mode local
 
-- Terminal sans PTY : pas de redimensionnement (resize ignoré).
+- Le terminal utilise un PTY Linux complet ; sur les plateformes non-Linux, le
+  backend conserve un fallback à base de pipes sans redimensionnement natif.
 - Redis en mémoire : les files temporaires sont perdues au redémarrage
   (sessions utilisateur et données persistées en base restent intactes).
-- Le moteur agent (`ohmyagent`) doit être installé sur la machine hôte ;
-  sans lui, le backend fonctionne mais les tâches ne démarrent pas.
-  Voir « Obtenir le vrai moteur ohmyagent » ci-dessous.
+- En développement depuis les sources, `opencode` doit être installé ou fourni
+  via `MCAI_TASKFLOW_LOCAL_AGENT_BIN`. Il est inclus dans le paquet `.deb`.
 - Pas d'isolation : l'agent tourne avec les droits de l'utilisateur qui lance
   le backend — à réserver à une machine de confiance.
