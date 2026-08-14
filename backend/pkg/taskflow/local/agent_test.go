@@ -100,6 +100,21 @@ func TestOpenCodeLineError(t *testing.T) {
 	if errObj["message"] != "Cannot connect to API" {
 		t.Fatalf("unexpected error message: %+v", errObj)
 	}
+	if payload["details"] != "Cannot connect to API" {
+		t.Fatalf("unexpected error details: %+v", payload)
+	}
+}
+
+func TestOpenCodeLineNestedProviderError(t *testing.T) {
+	line := `{"type":"error","error":{"name":"APIError","data":{"error":{"message":"Fireworks rejected max_tokens"}}}}`
+	chunks := openCodeLineToChunks([]byte(line))
+	if len(chunks) != 1 {
+		t.Fatalf("expected one task-error, got %+v", chunks)
+	}
+	payload := decodeACPData(t, chunks[0].Data)
+	if payload["details"] != "Fireworks rejected max_tokens" {
+		t.Fatalf("unexpected nested error details: %+v", payload)
+	}
 }
 
 func TestOpenCodeLineIgnored(t *testing.T) {
@@ -117,11 +132,11 @@ func TestOpenCodeLineIgnored(t *testing.T) {
 
 func TestOpenCodeArgs(t *testing.T) {
 	// Vérifie la construction des arguments de `opencode run` (comme dans
-	// spawnAgent : --format json --auto --model nemesiscode-ai/<model>).
-	args := []string{"run", "--format", "json", "--auto"}
+	// spawnAgent : sortie JSON + permissions auto + journal de diagnostic).
+	args := []string{"run", "--format", "json", "--auto", "--print-logs", "--log-level", "INFO"}
 	args = append(args, "--model", "nemesiscode-ai/test-model")
 	args = append(args, "Crée un fichier hello.txt")
-	want := `["run","--format","json","--auto","--model","nemesiscode-ai/test-model","Crée un fichier hello.txt"]`
+	want := `["run","--format","json","--auto","--print-logs","--log-level","INFO","--model","nemesiscode-ai/test-model","Crée un fichier hello.txt"]`
 	got, _ := json.Marshal(args)
 	if string(got) != want {
 		t.Fatalf("args mismatch:\n got %s\nwant %s", got, want)

@@ -6,8 +6,8 @@ package localhost
 import (
 	"context"
 	"fmt"
-	"os"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -55,7 +55,7 @@ func EnsureHost(ctx context.Context, cfg *config.Config, dbc *db.Client, l *slog
 		UserID:    owner.String(),
 		Hostname:  hostID,
 		Name:      hostID,
-		Version:   "nemesis-local-1.0",
+		Version:   "nemesis-local-1.2.0",
 		TTL:       taskflow.TTL{Kind: taskflow.TTLForever},
 		CreatedAt: time.Now().Unix(),
 	}

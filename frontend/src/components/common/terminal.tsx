@@ -178,8 +178,15 @@ export default function Terminal({
     const webLinksAddon = new WebLinksAddon();
     xtermInstance.current.loadAddon(fitAddon);
     if (isWebglSupported()) {
-      const webglAddon = new WebglAddon();
-      xtermInstance.current.loadAddon(webglAddon);
+      // WebGL peut être annoncé comme disponible puis échouer dans une VM,
+      // un vieux GPU ou un navigateur sans accélération. Le terminal doit
+      // alors rester fonctionnel avec le renderer canvas par défaut.
+      try {
+        const webglAddon = new WebglAddon();
+        xtermInstance.current.loadAddon(webglAddon);
+      } catch (error) {
+        console.warn('Terminal WebGL unavailable, using canvas renderer', error);
+      }
     }
     xtermInstance.current.loadAddon(unicode11Addon);
     xtermInstance.current.loadAddon(webLinksAddon);
@@ -205,7 +212,15 @@ export default function Terminal({
   const connectWebSocket = () => {
     setConnecting(true);
 
-    websocketInstance.current = new WebSocket(buildWebSocketUrl(ws));
+    try {
+      websocketInstance.current = new WebSocket(buildWebSocketUrl(ws));
+    } catch (error) {
+      console.error('Unable to create terminal WebSocket', error);
+      setConnecting(false);
+      setConnected(false);
+      toast.error(t("common.terminal.connectionError"));
+      return;
+    }
 
     websocketInstance.current.onopen = () => {
       pingLooper.current = window.setInterval(() => {
@@ -216,13 +231,24 @@ export default function Terminal({
     };
 
     websocketInstance.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      let data: any;
+      try {
+        data = JSON.parse(String(event.data));
+      } catch (error) {
+        console.error('Invalid terminal message', error);
+        return;
+      }
       if (data.type === 'data') {
         const decodedData = b64decode(data.data);
         xtermInstance.current?.write(decodedData);
       } else if (data.type === 'connected') {
-        const connectData = JSON.parse(data.data);
-        onUserNameChanged?.(connectData.username, connectData.avatar_url || "/logo-light.png");
+        let connectData: any = {};
+        try {
+          connectData = JSON.parse(data.data || '{}');
+        } catch (error) {
+          console.warn('Invalid terminal connection metadata', error);
+        }
+        onUserNameChanged?.(connectData.username || '', connectData.avatar_url || "/logo-light.png");
         toast.success(t("common.terminal.connected"));
         setConnecting(false);
         setConnected(true);

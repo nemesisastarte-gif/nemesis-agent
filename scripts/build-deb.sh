@@ -16,7 +16,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${1:-1.0.0}"
+VERSION="${1:-1.2.0}"
 OUT_DIR="$ROOT/dist-deb"
 STAGE="$OUT_DIR/stage"
 DEB="$OUT_DIR/nemesiscode_${VERSION}_amd64.deb"
@@ -29,7 +29,10 @@ export GOSUMDB=off
 export GOPROXY=direct
 
 echo "==> [1/4] Frontend (mode offline)…"
-(cd "$ROOT/frontend" && pnpm install --frozen-lockfile >/dev/null && pnpm run build:offline)
+# Aucun postinstall n'est requis pour le build Vite (les binaires esbuild sont
+# des optionalDependencies). --ignore-scripts évite aussi qu'un pnpm récent
+# bloque sur sa politique allowBuilds lors d'un build propre.
+(cd "$ROOT/frontend" && pnpm install --frozen-lockfile --ignore-scripts >/dev/null && pnpm run build:offline)
 
 echo "==> [2/4] Backend (binaire statique, GOAMD64=v1)…"
 (cd "$ROOT/backend" && go mod tidy && GOGC=40 go build -p "${GO_BUILD_P:-2}" \
@@ -47,13 +50,12 @@ OC_VER="$(npm view opencode-ai version 2>/dev/null || echo latest)"
 (cd "$OC_DIR" && npm install --no-audit --no-fund \
   "opencode-ai@$OC_VER" "opencode-linux-x64-baseline@$OC_VER" >/dev/null 2>&1)
 if [ ! -x "$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" ]; then
-  # Fallback : binaire x64 standard
-  (cd "$OC_DIR" && npm install --no-save --no-audit --no-fund \
-    "opencode-ai@$OC_VER" "opencode-linux-x64@$OC_VER" >/dev/null 2>&1)
+  echo "❌ opencode-linux-x64-baseline est introuvable." >&2
+  echo "   Refus du fallback x64 standard : il utilise AVX et plante sur Core 2 Duo." >&2
+  exit 1
 fi
 "$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" --version 2>/dev/null \
-  || "$OC_DIR/node_modules/opencode-linux-x64/bin/opencode" --version 2>/dev/null \
-  || { echo "❌ impossible d'obtenir le binaire opencode (npm)." >&2; exit 1; }
+  || { echo "❌ le binaire opencode baseline ne démarre pas sur cette machine." >&2; exit 1; }
 
 echo "==> [3/4] Assemblage du paquet…"
 rm -rf "$STAGE"
@@ -65,13 +67,8 @@ mkdir -p "$STAGE/usr/share/doc/nemesiscode"
 sed "s/^Version: .*/Version: $VERSION/" "$ROOT/packaging/deb/DEBIAN/control" > "$STAGE/DEBIAN/control"
 install -m 0755 "$ROOT/packaging/deb/usr/bin/nemesiscode" "$STAGE/usr/bin/nemesiscode"
 install -m 0755 "$OUT_DIR/nemesiscode-server" "$STAGE/usr/share/nemesiscode/nemesiscode-server"
-if [ -x "$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" ]; then
-  install -m 0755 "$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" \
-    "$STAGE/usr/share/nemesiscode/opencode"
-else
-  install -m 0755 "$OC_DIR/node_modules/opencode-linux-x64/bin/opencode" \
-    "$STAGE/usr/share/nemesiscode/opencode"
-fi
+install -m 0755 "$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" \
+  "$STAGE/usr/share/nemesiscode/opencode"
 cp -a "$ROOT/frontend/dist/." "$STAGE/usr/share/nemesiscode/web/"
 install -m 0644 "$ROOT/docs/deb-package.md" "$STAGE/usr/share/doc/nemesiscode/README.md"
 gzip -9n -c "$ROOT/docs/deb-package.md" > "$STAGE/usr/share/doc/nemesiscode/README.md.gz" 2>/dev/null || true

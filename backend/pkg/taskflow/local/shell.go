@@ -2,70 +2,114 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/teteekoue/NemesisCode/backend/pkg/taskflow"
 )
 
-// Shell 是 Sheller 的本机实现：一个 shell 子进程，stdin/stdout 用管道桥接。
-// v1 没有 PTY : resize 被忽略（见 docs/local-mode-design.md，后续可用 x/sys 升级）。
+// terminalProcess isole les détails PTY propres au système. Sous Linux (cible
+// du .deb), stdin/stdout pointent vers un vrai pseudo-terminal : le shell est
+// interactif, affiche son prompt, accepte Ctrl-C et reçoit les resize xterm.
+type terminalProcess struct {
+	cmd       *exec.Cmd
+	stdin     io.WriteCloser
+	stdout    io.ReadCloser
+	resize    func(cols, rows uint32) error
+	terminate func(syscall.Signal) error
+}
+
+// Shell est l'implémentation locale de Sheller autour d'un PTY.
 type Shell struct {
 	ctx        context.Context
 	terminalID string
+	createdAt  int64
 	cmd        *exec.Cmd
 	stdin      io.WriteCloser
 	stdout     io.ReadCloser
+	resize     func(cols, rows uint32) error
+	terminate  func(syscall.Signal) error
 	done       chan struct{}
-	once       sync.Once
+	stopOnce   sync.Once
+	doneOnce   sync.Once
+	closeOnce  sync.Once
+	writeMu    sync.Mutex
 }
 
 var _ taskflow.Sheller = (*Shell)(nil)
 
-func newShell(ctx context.Context, shellBin, dir, terminalID string) (*Shell, error) {
-	cmd := exec.Command(shellBin)
-	cmd.Dir = dir
-	cmd.Env = os.Environ()
-
-	stdin, err := cmd.StdinPipe()
+func newShell(
+	ctx context.Context,
+	shellBin, dir, terminalID, execCommand string,
+	size taskflow.TerminalSize,
+) (*Shell, error) {
+	process, err := startTerminalProcess(shellBin, dir, execCommand, size)
 	if err != nil {
-		return nil, fmt.Errorf("shell stdin pipe: %w", err)
+		return nil, err
 	}
-	// stdout + stderr fusionnés sur le même pipe (un seul flux pour le front).
-	pr, pw, err := os.Pipe()
-	if err != nil {
-		_ = stdin.Close()
-		return nil, fmt.Errorf("shell stdout pipe: %w", err)
-	}
-	cmd.Stdout = pw
-	cmd.Stderr = pw
 
-	if err := cmd.Start(); err != nil {
-		_ = stdin.Close()
-		_ = pr.Close()
-		_ = pw.Close()
-		return nil, fmt.Errorf("start shell %s: %w", shellBin, err)
-	}
-	_ = pw.Close() // le writer vit dans le child ; fermer ici évite les fuites
-
-	return &Shell{
+	s := &Shell{
 		ctx:        ctx,
 		terminalID: terminalID,
-		cmd:        cmd,
-		stdin:      stdin,
-		stdout:     pr,
+		createdAt:  time.Now().Unix(),
+		cmd:        process.cmd,
+		stdin:      process.stdin,
+		stdout:     process.stdout,
+		resize:     process.resize,
+		terminate:  process.terminate,
 		done:       make(chan struct{}),
-	}, nil
+	}
+
+	// Récolte toujours le processus pour éviter les zombies.
+	go func() {
+		_ = s.cmd.Wait()
+		s.finish()
+	}()
+	// Une déconnexion WebSocket annule ctx. Fermer le PTY débloque
+	// immédiatement BlockRead, même si le shell n'écrit rien.
+	go func() {
+		select {
+		case <-ctx.Done():
+			s.Stop()
+		case <-s.done:
+		}
+	}()
+	return s, nil
 }
 
-// Write 写入 shell 输入。resize 在 v1 被忽略（无 PTY）。
+func (s *Shell) finish() {
+	s.doneOnce.Do(func() {
+		close(s.done)
+	})
+}
+
+func (s *Shell) closeIO() {
+	s.closeOnce.Do(func() {
+		_ = s.stdin.Close()
+		_ = s.stdout.Close()
+	})
+}
+
+// Write écrit l'entrée du terminal ou applique sa nouvelle taille.
 func (s *Shell) Write(data taskflow.TerminalData) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	select {
+	case <-s.done:
+		return io.ErrClosedPipe
+	default:
+	}
 	if data.Resize != nil {
-		return nil
+		if s.resize == nil {
+			return nil
+		}
+		return s.resize(data.Resize.Col, data.Resize.Row)
 	}
 	if len(data.Data) == 0 {
 		return nil
@@ -74,43 +118,75 @@ func (s *Shell) Write(data taskflow.TerminalData) error {
 	return err
 }
 
-// Stop 停掉 shell 进程（SIGINT 优雅，2s 后 SIGKILL）。
+// Stop termine tout le groupe du shell, puis force l'arrêt après deux secondes.
 func (s *Shell) Stop() {
-	s.once.Do(func() {
-		close(s.done)
-		if s.cmd.Process != nil {
-			_ = s.cmd.Process.Signal(os.Interrupt)
-			go func() {
-				time.Sleep(2 * time.Second)
-				_ = s.cmd.Process.Kill()
-			}()
+	s.stopOnce.Do(func() {
+		if s.terminate != nil {
+			_ = s.terminate(syscall.SIGHUP)
+			_ = s.terminate(syscall.SIGTERM)
 		}
-		_ = s.stdin.Close()
-		_ = s.stdout.Close() // 解除 BlockRead 中的阻塞读
+		// Fermer le master PTY fait sortir les lectures et signale aussi un
+		// hangup au shell.
+		s.finish()
+		s.closeIO()
+		go func() {
+			time.Sleep(2 * time.Second)
+			if s.terminate != nil {
+				_ = s.terminate(syscall.SIGKILL)
+			} else if s.cmd.Process != nil {
+				_ = s.cmd.Process.Kill()
+			}
+		}()
 	})
 }
 
-// BlockRead 逐块读取 shell 输出并回调。先发一个 Connected 事件（与远端
-// taskflow 语义一致），然后持续发 Data 事件，直到 ctx 取消、Stop 或进程退出。
+// BlockRead transmet le flux PTY au navigateur. Le message Connected est
+// envoyé avant le premier prompt afin que xterm puisse immédiatement envoyer
+// sa taille et recevoir l'affichage interactif.
 func (s *Shell) BlockRead(fn func(taskflow.TerminalData)) error {
 	fn(taskflow.TerminalData{Connected: true})
 	buf := make([]byte, 32*1024)
 	for {
-		select {
-		case <-s.ctx.Done():
-			return nil
-		case <-s.done:
-			return nil
-		default:
-		}
 		n, err := s.stdout.Read(buf)
 		if n > 0 {
-			data := make([]byte, n)
-			copy(data, buf[:n])
+			data := append([]byte(nil), buf[:n]...)
 			fn(taskflow.TerminalData{Data: data})
 		}
 		if err != nil {
-			return nil // EOF / closed
+			s.closeIO()
+			select {
+			case <-s.done:
+				return nil
+			case <-s.ctx.Done():
+				return nil
+			default:
+				// Linux renvoie EIO sur le master PTY quand le dernier fd du
+				// slave se ferme. C'est l'équivalent normal d'un EOF.
+				if err == io.EOF || errors.Is(err, syscall.EIO) {
+					return nil
+				}
+				return fmt.Errorf("read local terminal: %w", err)
+			}
 		}
 	}
+}
+
+func setEnv(env []string, key, value string) []string {
+	prefix := key + "="
+	out := make([]string, 0, len(env)+1)
+	for _, item := range env {
+		if len(item) >= len(prefix) && item[:len(prefix)] == prefix {
+			continue
+		}
+		out = append(out, item)
+	}
+	return append(out, prefix+value)
+}
+
+func terminalEnv(dir string) []string {
+	env := os.Environ()
+	env = setEnv(env, "PWD", dir)
+	env = setEnv(env, "TERM", "xterm-256color")
+	env = setEnv(env, "COLORTERM", "truecolor")
+	return env
 }

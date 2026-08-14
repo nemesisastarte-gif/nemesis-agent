@@ -41,17 +41,24 @@ port_busy() {
 }
 
 resolve_engine() {
-  # Le moteur agent (opencode) est EMBARQUÉ dans le paquet
-  # (/usr/share/nemesiscode/opencode). On accepte aussi un binaire fourni
-  # par l'utilisateur (dépôt officiel : https://github.com/anomalyco/opencode).
+  # Le binaire baseline EMBARQUÉ passe avant les anciennes copies utilisateur.
+  # Une installation 1.0 pouvait avoir laissé ~/.nemesiscode/opencode compilé
+  # avec AVX : le sélectionner avant le baseline provoquait SIGILL sur Core 2.
   local cand
+  if [ -n "${MCAI_TASKFLOW_LOCAL_AGENT_BIN:-}" ]; then
+    cand="$MCAI_TASKFLOW_LOCAL_AGENT_BIN"
+    if [ -x "$cand" ] && "$cand" --version >/dev/null 2>&1; then
+      echo "$cand"
+      return 0
+    fi
+  fi
   for cand in \
-    "$STATE_DIR/opencode" \
     /usr/share/nemesiscode/opencode \
+    "$STATE_DIR/opencode" \
     "$HOME/.local/bin/opencode" \
     /usr/local/bin/opencode \
     "$(command -v opencode 2>/dev/null || true)"; do
-    if [ -n "$cand" ] && [ -x "$cand" ]; then
+    if [ -n "$cand" ] && [ -x "$cand" ] && "$cand" --version >/dev/null 2>&1; then
       echo "$cand"
       return 0
     fi
@@ -95,10 +102,19 @@ cmd_on() {
   export MCAI_STATIC_FILES_DIR="${MCAI_STATIC_FILES_DIR:-$WEB_DIR}"
   export MCAI_STATIC_FILES_ROUTE_PREFIX="${MCAI_STATIC_FILES_ROUTE_PREFIX:-/}"
   export MCAI_TASKFLOW_LOCAL_PERMISSION_MODE="${MCAI_TASKFLOW_LOCAL_PERMISSION_MODE:-yolo}"
+  if [ -z "${MCAI_TASKFLOW_LOCAL_SHELL:-}" ]; then
+    if [ -x /bin/bash ]; then
+      export MCAI_TASKFLOW_LOCAL_SHELL=/bin/bash
+    else
+      export MCAI_TASKFLOW_LOCAL_SHELL=/bin/sh
+    fi
+  fi
 
   local engine
   if engine="$(resolve_engine)"; then
-    export MCAI_TASKFLOW_LOCAL_AGENT_BIN="${MCAI_TASKFLOW_LOCAL_AGENT_BIN:-$engine}"
+    # resolve_engine a déjà validé une éventuelle surcharge explicite. Utiliser
+    # impérativement son résultat pour ne pas réinjecter un ancien binaire AVX.
+    export MCAI_TASKFLOW_LOCAL_AGENT_BIN="$engine"
   else
     echo "ℹ️  Moteur opencode non trouvé — l'interface (modèles, tâches) marchera,"
     echo "   mais l'exécution des tâches nécessite le binaire du moteur."
@@ -168,7 +184,9 @@ cmd_status() {
     echo "⏹  NemesisCode : arrêté"
   fi
   if engine="$(resolve_engine)"; then
-    echo "   ⚙️  Moteur agent (opencode) : $engine"
+    local engine_version
+    engine_version="$("$engine" --version 2>/dev/null | head -1 || true)"
+    echo "   ⚙️  Moteur agent (opencode ${engine_version:-version inconnue}) : $engine"
   else
     echo "   ⚠️  Moteur agent : NON trouvé (tâches non exécutables)."
     echo "       Placez opencode dans ~/.nemesiscode/opencode — voir docs/deb-package.md"

@@ -153,6 +153,9 @@ export default function TaskDetailPage() {
   const taskInteractive = task?.status === ConstsTaskStatus.TaskStatusProcessing
   const canPublishWebsite = !IS_OFFLINE_EDITION && serverConfig?.region === "cn"
   const envid = task?.virtualmachine?.id
+  // En mode local le workspace persiste même si une tâche a été marquée en
+  // erreur après un redémarrage. Son terminal doit rester accessible.
+  const terminalAvailable = taskInteractive || (IS_OFFLINE_EDITION && Boolean(envid))
   const cancelledRef = React.useRef(false)
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const queuedReplyIdSet = React.useMemo(() => new Set(queuedReplyIds), [queuedReplyIds])
@@ -1512,7 +1515,7 @@ export default function TaskDetailPage() {
               size="sm"
               className={cn("h-7 gap-1 px-2 text-sm font-normal", terminalPanelOpen && "text-primary bg-accent")}
               onClick={toggleTerminalPanel}
-              disabled={!taskInteractive}
+              disabled={!terminalAvailable}
             >
               <IconTerminal2 className="size-3.5" />
               {t("taskDetail.panels.terminal")}
@@ -1752,7 +1755,7 @@ export default function TaskDetailPage() {
               <ResizableHandle withHandle className="mt-2 shrink-0 bg-transparent after:hidden" />
               <ResizablePanel id="bottom-terminal" defaultSize={25} minSize={20} className="min-h-0">
                 <div className="h-full w-full border rounded-md overflow-hidden">
-                  <TaskTerminalPanel envid={envid} disabled={!taskInteractive} onClosePanel={() => setTerminalPanelOpen(false)} />
+                  <TaskTerminalPanel envid={envid} disabled={!terminalAvailable} onClosePanel={() => setTerminalPanelOpen(false)} />
                 </div>
               </ResizablePanel>
             </>

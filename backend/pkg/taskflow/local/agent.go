@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -49,6 +49,8 @@ type agentClient struct {
 	stdout  io.ReadCloser
 	done    chan struct{}
 	waitErr chan error
+	logPath string
+	ignored atomic.Bool // remplacement/arrêt volontaire : ne pas publier de fin
 }
 
 // startOpenCodeRun lance `bin args...` avec cwd = workspace. Le processus est
@@ -58,18 +60,25 @@ type agentClient struct {
 func startOpenCodeRun(bin string, args []string, cwd string, env []string, logPath string) (*agentClient, error) {
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), env...)
+	cmd.Env = os.Environ()
+	for _, item := range env {
+		if key, value, ok := strings.Cut(item, "="); ok && key != "" {
+			cmd.Env = setEnv(cmd.Env, key, value)
+		}
+	}
 	// opencode détermine son répertoire de projet via la variable PWD : on la
-	// force au workspace (sinon l'environnement hérité du serveur — lancé
-	// depuis un autre répertoire — pointerait ailleurs que le cwd réel).
-	cmd.Env = append(cmd.Env, "PWD="+cwd)
+	// force au workspace sans conserver de doublon hérité du serveur.
+	cmd.Env = setEnv(cmd.Env, "PWD", cwd)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("opencode stdout pipe: %w", err)
 	}
-	if lf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+	var logFile *os.File
+	if lf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600); err == nil {
+		logFile = lf
+		_ = os.Chmod(logPath, 0o600)
 		cmd.Stderr = lf
 	} else {
 		cmd.Stderr = os.Stderr
@@ -77,7 +86,15 @@ func startOpenCodeRun(bin string, args []string, cwd string, env []string, logPa
 
 	if err := cmd.Start(); err != nil {
 		_ = stdout.Close()
+		if logFile != nil {
+			_ = logFile.Close()
+		}
 		return nil, fmt.Errorf("start opencode: %w", err)
+	}
+	// exec a dupliqué le descripteur pour l'enfant : le parent n'en a plus
+	// besoin. Le fermer ici évite une fuite à chaque tour de conversation.
+	if logFile != nil {
+		_ = logFile.Close()
 	}
 
 	ac := &agentClient{
@@ -85,6 +102,7 @@ func startOpenCodeRun(bin string, args []string, cwd string, env []string, logPa
 		stdout:  stdout,
 		done:    make(chan struct{}),
 		waitErr: make(chan error, 1),
+		logPath: logPath,
 	}
 	go func() {
 		ac.waitErr <- cmd.Wait()
@@ -136,11 +154,11 @@ func acpUpdate(update any) *taskflow.TaskChunk {
 
 // openCodePart est le contenu de l'event "part" (selon le type d'event).
 type openCodePart struct {
-	Type   string          `json:"type"`
-	Text   string          `json:"text"`
-	Tool   string          `json:"tool"`
-	CallID string          `json:"callID"`
-	Reason string          `json:"reason"`
+	Type   string            `json:"type"`
+	Text   string            `json:"text"`
+	Tool   string            `json:"tool"`
+	CallID string            `json:"callID"`
+	Reason string            `json:"reason"`
 	State  openCodeToolState `json:"state"`
 }
 
@@ -217,28 +235,17 @@ func openCodeLineToChunks(line []byte) []*taskflow.TaskChunk {
 		}
 
 	case "error":
-		var e struct {
-			Name string `json:"name"`
-			Data struct {
-				Message string `json:"message"`
-			} `json:"data"`
-		}
-		_ = json.Unmarshal(ev.Err, &e)
-		msg := e.Data.Message
+		msg := openCodeErrorMessage(ev.Err)
 		if msg == "" {
-			msg = e.Name
+			// Certaines versions placent l'erreur dans `part` plutôt que
+			// dans `error`. Accepter les deux formes rend le diagnostic
+			// compatible avec les mises à jour du binaire embarqué.
+			msg = openCodeErrorMessage(ev.Part)
 		}
 		if msg == "" {
 			msg = "opencode error"
 		}
-		// Format frontend : le composant error_message lit data.details.
-		return []*taskflow.TaskChunk{{
-			Event: "task-error",
-			Data: rawJSON(map[string]any{
-				"details": msg,
-				"error":   map[string]any{"message": msg},
-			}),
-		}}
+		return []*taskflow.TaskChunk{taskErrorChunk(msg)}
 
 	default:
 		// step_start / step_finish / … : rien à afficher.
@@ -263,69 +270,158 @@ func decodeRaw(raw json.RawMessage) any {
 	return strings.TrimSpace(string(raw))
 }
 
+// taskErrorChunk conserve l'ancien champ error.message mais fournit aussi le
+// champ details que le frontend affiche. Sans ce champ, le badge était vide et
+// ne proposait qu'un « reload » incapable d'expliquer une erreur fournisseur.
+func taskErrorChunk(details string) *taskflow.TaskChunk {
+	details = strings.TrimSpace(details)
+	if details == "" {
+		details = "opencode error"
+	}
+	if len(details) > 12_000 {
+		details = details[len(details)-12_000:]
+	}
+	return &taskflow.TaskChunk{
+		Event: "task-error",
+		Data: rawJSON(map[string]any{
+			"details": details,
+			"message": details,
+			"error":   map[string]any{"message": details},
+		}),
+	}
+}
+
+// openCodeErrorMessage extrait un message utile des différentes formes
+// d'erreurs opencode/API observées (error.data.message, error.message,
+// error.data.error.message, chaîne brute, etc.).
+func openCodeErrorMessage(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return strings.TrimSpace(string(raw))
+	}
+	return nestedErrorMessage(value, 0)
+}
+
+func nestedErrorMessage(value any, depth int) string {
+	if depth > 8 || value == nil {
+		return ""
+	}
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case map[string]any:
+		// Les champs les plus précis passent avant le nom générique de
+		// l'exception (APIError, UnknownError…).
+		for _, key := range []string{"details", "message", "error", "data", "cause", "body", "name"} {
+			if child, ok := v[key]; ok {
+				if msg := nestedErrorMessage(child, depth+1); msg != "" {
+					return msg
+				}
+			}
+		}
+	case []any:
+		for _, child := range v {
+			if msg := nestedErrorMessage(child, depth+1); msg != "" {
+				return msg
+			}
+		}
+	}
+	return ""
+}
+
+// tailLog retourne les dernières lignes du journal opencode produit par
+// --print-logs. Il est joint aux erreurs de processus (crash, instruction
+// illégale, configuration invalide) au lieu d'afficher seulement « exit 1 ».
+func tailLog(path string, maxLines int) string {
+	b, err := os.ReadFile(path)
+	if err != nil || len(b) == 0 {
+		return ""
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	if len(lines) > maxLines {
+		lines = lines[len(lines)-maxLines:]
+	}
+	return strings.Join(lines, "\n")
+}
+
 // streamOpenCode lit la sortie NDJSON du process et publie les chunks dans le
 // LiveStream de la tâche ; à la fin du process, publie task-ended (success si
 // exit 0, sinon task-error + failed) — sauf arrêt volontaire (Cancel/Stop).
 func (c *Client) streamOpenCode(rec *VM, agent *agentClient) {
 	scanner := bufio.NewScanner(agent.stdout)
 	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
+	sawEngineError := false
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
 		}
 		for _, chunk := range openCodeLineToChunks([]byte(line)) {
+			if chunk.Event == "task-error" {
+				sawEngineError = true
+			}
 			rec.live.Publish(chunk)
 		}
 	}
+	scanErr := scanner.Err()
 
 	waitErr := <-agent.waitErr
 
 	rec.mu.Lock()
 	stopped := rec.stopped
-	rec.agent = nil
+	// Ne pas effacer le nouveau process si un Restart a remplacé celui-ci
+	// pendant sa terminaison.
+	if rec.agent == agent {
+		rec.agent = nil
+	}
 	rec.mu.Unlock()
 
-	if stopped {
-		return // Cancel a déjà publié task-ended cancelled
+	if stopped || agent.ignored.Load() {
+		return // Cancel/Stop/Restart gère déjà la fin ou remplace ce tour
 	}
 
-	success := waitErr == nil
+	if scanErr != nil {
+		details := fmt.Sprintf("lecture de la sortie opencode impossible: %v", scanErr)
+		if logTail := tailLog(agent.logPath, 30); logTail != "" {
+			details += "\n\nJournal opencode:\n" + logTail
+		}
+		rec.live.Publish(taskErrorChunk(details))
+		sawEngineError = true
+	}
+
+	if waitErr != nil && !sawEngineError {
+		msg := "opencode failed"
+		if ee, ok := waitErr.(*exec.ExitError); ok {
+			msg = fmt.Sprintf("opencode s'est arrêté avec le code %d", ee.ExitCode())
+		} else {
+			msg = fmt.Sprintf("opencode a échoué: %v", waitErr)
+		}
+		if logTail := tailLog(agent.logPath, 30); logTail != "" {
+			msg += "\n\nJournal opencode:\n" + logTail
+		}
+		rec.live.Publish(taskErrorChunk(msg))
+		sawEngineError = true
+	}
+
+	success := waitErr == nil && scanErr == nil && !sawEngineError
+	kind := "success"
+	if !success {
+		kind = "failed"
+	}
+	rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: kind})
+	c.logger.Info("local opencode run finished", "vm_id", rec.record.ID,
+		"err", waitErr, "stream_error", scanErr, "engine_error", sawEngineError)
+
 	taskID := ""
 	rec.mu.Lock()
 	if rec.lastReq != nil {
 		taskID = rec.lastReq.ID.String()
 	}
 	rec.mu.Unlock()
-
-	if success {
-		rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: "success"})
-	} else {
-		msg := "opencode failed"
-		if ee, ok := waitErr.(*exec.ExitError); ok {
-			msg = fmt.Sprintf("opencode exited with code %d", ee.ExitCode())
-		} else {
-			msg = fmt.Sprintf("opencode failed: %v", waitErr)
-		}
-		// En cas de sortie anormale sans event error sur stdout (crash au
-		// démarrage, config invalide…), on joint la fin du log opencode pour
-		// que l'erreur affichée dans l'UI soit exploitable.
-		if tail := tailFile(filepath.Join(engineDirFor(rec.workspace), "opencode.log"), 8); tail != "" {
-			msg += "\n" + tail
-		}
-		rec.live.Publish(&taskflow.TaskChunk{
-			Event: "task-error",
-			Data: rawJSON(map[string]any{
-				"details": msg,
-				"error":   map[string]any{"message": msg},
-			}),
-		})
-		rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: "failed"})
-	}
-	c.logger.Info("local opencode run finished", "vm_id", rec.record.ID, "err", waitErr)
-
-	// Notifie le backend pour la transition processing → finished/error en DB
-	// (même contrat que la fin de tour notifiée par le taskflow cloud).
+	// Notifie le backend pour la transition processing → finished/error en DB.
 	if taskID != "" {
 		c.notifyTaskFinished(taskID, success)
 	}
@@ -362,24 +458,4 @@ func (c *Client) notifyTaskFinished(taskID string, success bool) {
 	if resp.StatusCode >= 300 {
 		c.logger.Warn("task-finished callback non-2xx", "task_id", taskID, "status", resp.StatusCode)
 	}
-}
-
-// tailFile retourne les n dernières lignes d'un fichier (utile pour joindre
-// le log du moteur à un message d'erreur).
-func tailFile(path string, n int) string {
-	f, err := os.Open(path)
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
-	lines := make([]string, 0, n)
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		lines = append(lines, sc.Text())
-		if len(lines) > n {
-			lines = lines[1:]
-		}
-	}
-	return strings.Join(lines, "\n")
 }

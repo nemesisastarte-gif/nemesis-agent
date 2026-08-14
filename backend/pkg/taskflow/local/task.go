@@ -42,9 +42,14 @@ func (m *taskManager) Create(ctx context.Context, req taskflow.CreateTaskReq) er
 	rec.mu.Unlock()
 
 	if err := m.persistTaskConfig(rec); err != nil {
-		return err
+		m.publishStartFailure(ctx, rec, err)
+		return nil
 	}
-	return m.c.spawnAgent(ctx, rec, false)
+	if err := m.c.spawnAgent(ctx, rec, false); err != nil {
+		m.publishStartFailure(ctx, rec, err)
+		return nil
+	}
+	return nil
 }
 
 // persistTaskConfig sérialise la config de tâche dans le workspace
@@ -61,10 +66,24 @@ func (m *taskManager) persistTaskConfig(rec *VM) error {
 		return fmt.Errorf("marshal task config: %w", err)
 	}
 	cfgPath := filepath.Join(rec.workspace, taskConfigFile)
-	if err := os.WriteFile(cfgPath, b, 0o644); err != nil {
+	// Le fichier contient la clé API du provider : il ne doit jamais être
+	// lisible par les autres utilisateurs de la machine.
+	if err := writeFileMode(cfgPath, b, 0o600); err != nil {
 		return fmt.Errorf("write task config: %w", err)
 	}
 	return nil
+}
+
+// publishStartFailure transforme les erreurs de préparation/lancement en un
+// vrai tour de tâche échoué. Le lifecycle conserve la tâche en mode
+// interactif, le navigateur peut donc rejouer le détail et l'utilisateur peut
+// corriger son modèle puis réessayer, au lieu de rester bloqué sur « reload ».
+func (m *taskManager) publishStartFailure(ctx context.Context, rec *VM, err error) {
+	details := fmt.Sprintf("Impossible de démarrer le moteur opencode: %v", err)
+	rec.live.Publish(taskErrorChunk(details))
+	rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: "failed"})
+	m.c.logger.ErrorContext(ctx, "local opencode start failed",
+		"vm_id", rec.record.ID, "error", err)
 }
 
 // spawnAgent lance `opencode run` pour la tâche du workspace rec.
@@ -99,7 +118,9 @@ func (c *Client) spawnAgent(ctx context.Context, rec *VM, resume bool) error {
 	if bin == "" {
 		bin = "opencode"
 	}
-	args := []string{"run", "--format", "json", "--auto"}
+	// --print-logs envoie le diagnostic interne vers stderr, capturé dans le
+	// journal privé du workspace. Sans lui, un crash n'affichait que « exit 1 ».
+	args := []string{"run", "--format", "json", "--auto", "--print-logs", "--log-level", "INFO"}
 	if resume {
 		args = append(args, "--continue")
 	}
@@ -113,7 +134,7 @@ func (c *Client) spawnAgent(ctx context.Context, rec *VM, resume bool) error {
 	// NB: exec.Command (pas CommandContext) — le ctx du hook lifecycle peut
 	// être annulé dès que handleProcessing rend la main. La fin de vie est
 	// gérée explicitement par stopAgent / la fin naturelle du process.
-	agent, err := startOpenCodeRun(bin, args, rec.workspace, []string{
+	agentEnv := []string{
 		"OPENCODE_DISABLE_AUTOUPDATE=1",
 		"OPENCODE_DISABLE_ERROR_REPORTING=1",
 		"OPENCODE_DISABLE_USAGE=1",
@@ -121,7 +142,14 @@ func (c *Client) spawnAgent(ctx context.Context, rec *VM, resume bool) error {
 		"NEMESIS_TASK_ID=" + req.ID.String(),
 		"NEMESIS_VM_ID=" + rec.record.ID,
 		"NEMESIS_WORKSPACE=" + rec.workspace,
-	}, filepath.Join(engineDir, "opencode.log"))
+	}
+	for key, value := range req.Env {
+		if key != "" && !strings.Contains(key, "=") {
+			agentEnv = append(agentEnv, key+"="+value)
+		}
+	}
+	agent, err := startOpenCodeRun(bin, args, rec.workspace, agentEnv,
+		filepath.Join(engineDir, "opencode.log"))
 	if err != nil {
 		return err
 	}
@@ -151,10 +179,7 @@ func materializeConfigs(configs []taskflow.ConfigFile) error {
 		if cf.Path == "" {
 			continue
 		}
-		p := cf.Path
-		if strings.HasPrefix(p, "~/") {
-			p = filepath.Join(home, p[2:])
-		}
+		p := expandConfigHome(cf.Path, home)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return fmt.Errorf("create config dir %s: %w", filepath.Dir(p), err)
 		}
@@ -162,11 +187,36 @@ func materializeConfigs(configs []taskflow.ConfigFile) error {
 		if cf.Mode != nil {
 			mode = os.FileMode(*cf.Mode)
 		}
-		if err := os.WriteFile(p, []byte(cf.Content), mode); err != nil {
+		// opencode ne développe pas `${HOME}` dans les chemins de son JSON et
+		// les traite comme relatifs au workspace. Matérialiser la valeur absolue
+		// en mode local rend rules/skills réellement accessibles.
+		content := strings.ReplaceAll(cf.Content, "${HOME}", home)
+		if err := writeFileMode(p, []byte(content), mode); err != nil {
 			return fmt.Errorf("write config %s: %w", p, err)
 		}
 	}
 	return nil
+}
+
+func expandConfigHome(path, home string) string {
+	if path == "~" || path == "${HOME}" {
+		return home
+	}
+	for _, prefix := range []string{"~/", "${HOME}/"} {
+		if strings.HasPrefix(path, prefix) {
+			return filepath.Join(home, path[len(prefix):])
+		}
+	}
+	return path
+}
+
+func writeFileMode(path string, content []byte, mode os.FileMode) error {
+	if err := os.WriteFile(path, content, mode); err != nil {
+		return err
+	}
+	// os.WriteFile conserve les permissions d'un fichier existant. Chmod est
+	// donc nécessaire pour sécuriser aussi les installations mises à niveau.
+	return os.Chmod(path, mode)
 }
 
 // openCodeNpmPackage mappe l'interface_type du modèle vers le paquet npm
@@ -190,11 +240,19 @@ func writeProjectOpenCodeConfig(ws string, llm taskflow.LLM) error {
 	if llm.Model == "" {
 		return nil
 	}
+	contextLimit := llm.ContextLimit
+	if contextLimit <= 0 {
+		contextLimit = 200000
+	}
+	outputLimit := llm.OutputLimit
+	if outputLimit <= 0 {
+		outputLimit = 32000
+	}
 	cfg := map[string]any{
 		"provider": map[string]any{
 			"nemesiscode-ai": map[string]any{
-				"npm":   openCodeNpmPackage(string(llm.ApiType)),
-				"name":  "nemesiscode-ai",
+				"npm":  openCodeNpmPackage(string(llm.ApiType)),
+				"name": "nemesiscode-ai",
 				"options": map[string]any{
 					"baseURL": llm.BaseURL,
 					"apiKey":  llm.ApiKey,
@@ -202,12 +260,12 @@ func writeProjectOpenCodeConfig(ws string, llm taskflow.LLM) error {
 				"models": map[string]any{
 					llm.Model: map[string]any{
 						"name":  llm.Model,
-						"limit": map[string]any{"context": 200000, "output": 32768},
+						"limit": map[string]any{"context": contextLimit, "output": outputLimit},
 					},
 				},
 			},
 		},
-		"model":             "nemesiscode-ai/" + llm.Model,
+		"model":              "nemesiscode-ai/" + llm.Model,
 		"disabled_providers": []string{"openai", "opencode"},
 		"permission": map[string]any{
 			"doom_loop":          "allow",
@@ -219,7 +277,8 @@ func writeProjectOpenCodeConfig(ws string, llm taskflow.LLM) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(ws, "opencode.json"), b, 0o644)
+	// apiKey est inline : permissions strictes obligatoires.
+	return writeFileMode(filepath.Join(ws, "opencode.json"), b, 0o600)
 }
 
 // ---------------------------------------------------------------------------
@@ -297,17 +356,20 @@ func (m *taskManager) Continue(ctx context.Context, req taskflow.TaskReq) error 
 	return m.c.spawnAgent(ctx, rec, true)
 }
 
-// Restart relance le moteur (reprise de la session avec --continue).
+// Restart réinitialise le processus local. Contrairement au moteur distant,
+// opencode run n'est pas un daemon à « recharger » : le message de réparation
+// est envoyé juste après par le frontend et Continue le relancera avec
+// --continue. Le lancer ici dupliquerait l'ancien prompt et provoquerait deux
+// tours concurrents.
 func (m *taskManager) Restart(ctx context.Context, req taskflow.RestartTaskReq) (*taskflow.RestartTaskResp, error) {
 	rec := m.c.getVMByTask(req.ID.String())
 	if rec == nil {
-		return nil, fmt.Errorf("environment not found: %s", req.ID)
-	}
-	if err := m.c.spawnAgent(ctx, rec, true); err != nil {
 		return &taskflow.RestartTaskResp{
-			ID: req.ID, RequestId: req.RequestId, Success: false, Message: err.Error(),
+			ID: req.ID, RequestId: req.RequestId, Success: false,
+			Message: fmt.Sprintf("environment not found: %s", req.ID),
 		}, nil
 	}
+	m.c.stopAgent(rec)
 	return &taskflow.RestartTaskResp{
 		ID: req.ID, RequestId: req.RequestId, Success: true,
 	}, nil

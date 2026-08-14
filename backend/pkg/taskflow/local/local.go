@@ -9,6 +9,7 @@ package local
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/teteekoue/NemesisCode/backend/config"
 	"github.com/teteekoue/NemesisCode/backend/pkg/taskflow"
@@ -111,6 +113,12 @@ func NewClient(cfg config.LocalTaskFlow, logger *slog.Logger, opts ...func(*Clie
 	for _, opt := range opts {
 		opt(c)
 	}
+	// Le registre des VM est en mémoire, mais les workspaces persistent. Les
+	// restaurer au démarrage garde le terminal et l'explorateur utilisables
+	// après `nemesiscode restart`.
+	if err := c.restoreWorkspaces(); err != nil {
+		c.logger.Warn("restore local workspaces failed", "error", err)
+	}
 	return c, nil
 }
 
@@ -124,6 +132,98 @@ func expandHome(p string) string {
 		return filepath.Join(home, p[2:])
 	}
 	return p
+}
+
+func (c *Client) restoreWorkspaces() error {
+	entries, err := os.ReadDir(c.root)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if _, err := c.ensureVM(entry.Name()); err != nil {
+			c.logger.Warn("skip invalid local workspace", "workspace", entry.Name(), "error", err)
+		}
+	}
+	return nil
+}
+
+// ensureVM reconstruit à la demande l'enregistrement mémoire d'un workspace
+// persistant. C'est indispensable pour les terminaux après redémarrage du
+// backend, car la VM locale est un répertoire et non un conteneur éphémère.
+func (c *Client) ensureVM(id string) (*VM, error) {
+	if id == "" || filepath.Base(id) != id || id == "." || id == ".." {
+		return nil, fmt.Errorf("invalid environment id: %q", id)
+	}
+
+	c.mu.Lock()
+	if rec := c.vms[id]; rec != nil {
+		c.mu.Unlock()
+		return rec, nil
+	}
+	c.mu.Unlock()
+
+	ws := filepath.Join(c.root, id)
+	info, err := os.Stat(ws)
+	if err != nil {
+		return nil, fmt.Errorf("environment not found: %s", id)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("environment workspace is not a directory: %s", id)
+	}
+
+	var lastReq *taskflow.CreateTaskReq
+	cfgPath := filepath.Join(ws, taskConfigFile)
+	if b, err := os.ReadFile(cfgPath); err == nil {
+		var req taskflow.CreateTaskReq
+		if err := json.Unmarshal(b, &req); err != nil {
+			c.logger.Warn("invalid persisted task config", "vm_id", id, "error", err)
+		} else {
+			lastReq = &req
+		}
+		// Met à niveau les permissions des anciennes installations 1.1.
+		_ = os.Chmod(cfgPath, 0o600)
+	}
+	_ = os.Chmod(filepath.Join(ws, "opencode.json"), 0o600)
+
+	hostname, _ := os.Hostname()
+	rec := &VM{
+		record: &taskflow.VirtualMachine{
+			ID:            id,
+			HostID:        c.hostID,
+			Hostname:      hostname,
+			Arch:          runtime.GOARCH,
+			OS:            runtime.GOOS,
+			Name:          "local-" + id,
+			Status:        taskflow.VirtualMachineStatusOnline,
+			StatusMessage: "restored local environment on host",
+			Cores:         int32(runtime.NumCPU()),
+			TTL:           taskflow.TTL{Kind: taskflow.TTLForever},
+			CreatedAt:     info.ModTime().Unix(),
+			Version:       "nemesis-local-1.2.0",
+		},
+		workspace: ws,
+		live:      NewLiveStream(),
+		shells:    make(map[string]*Shell),
+		ports:     make(map[string]*taskflow.PortForwardInfo),
+		lastReq:   lastReq,
+	}
+	if rec.record.CreatedAt == 0 {
+		rec.record.CreatedAt = time.Now().Unix()
+	}
+
+	c.mu.Lock()
+	if existing := c.vms[id]; existing != nil {
+		c.mu.Unlock()
+		return existing, nil
+	}
+	c.vms[id] = rec
+	c.mu.Unlock()
+	c.logger.Info("local workspace restored", "vm_id", id, "workspace", ws,
+		"has_task_config", lastReq != nil)
+	return rec, nil
 }
 
 // ---- taskflow.Clienter ----
@@ -183,8 +283,13 @@ func (c *Client) TaskLive(ctx context.Context, taskID string, flush bool, fn fun
 
 func (c *Client) getVM(id string) *VM {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.vms[id]
+	rec := c.vms[id]
+	c.mu.Unlock()
+	if rec != nil {
+		return rec
+	}
+	rec, _ = c.ensureVM(id)
+	return rec
 }
 
 // getVMByTask 通过任务 UUID 找 VM（CreateTaskReq.ID）。
@@ -213,6 +318,7 @@ func (c *Client) stopAgent(rec *VM) bool {
 	if ag == nil {
 		return false
 	}
+	ag.ignored.Store(true)
 	ag.close()
 	return true
 }
@@ -235,7 +341,7 @@ func (c *Client) hostInfo() *taskflow.Host {
 		Memory:   readMemTotal(),
 		Disk:     readDiskTotal(c.root),
 		TTL:      taskflow.TTL{Kind: taskflow.TTLForever},
-		Version:  "nemesis-local-1.0",
+		Version:  "nemesis-local-1.2.0",
 	}
 }
 

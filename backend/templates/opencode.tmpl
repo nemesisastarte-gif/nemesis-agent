@@ -14,9 +14,9 @@
       },
       "models": {
         "{{.model}}": {
-{{- if or (not .thinking_enabled) .force_reasoning }}
+{{- if or (and (not .thinking_enabled) .thinking_option_supported) .force_reasoning }}
           "options": {
-{{- if not .thinking_enabled }}
+{{- if and (not .thinking_enabled) .thinking_option_supported }}
             "thinking": {"type":"disabled"}{{if .force_reasoning}},{{end}}
 {{- end }}
 {{- if .force_reasoning }}

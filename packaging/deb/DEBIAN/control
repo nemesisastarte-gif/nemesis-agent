@@ -12,13 +12,13 @@ Description: NemesisCode — plateforme d'agents de code 100% locale (paquet tou
  fonctionne entièrement en local : base SQLite, Redis intégré en mémoire,
  stockage fichier, frontend servi par le backend sur un seul port.
  .
- Le paquet contient un binaire statique (aucune dépendance glibc, aucune
- instruction AVX requise — compatible Core 2 Duo / vieux PC) et le frontend
- compilé.
+ Le paquet contient un backend statique, le frontend compilé et le moteur
+ opencode baseline (aucune instruction AVX requise — compatible Core 2 Duo et
+ vieux PC).
  .
  Utilisation :
    nemesiscode on     → http://localhost:5000 (connexion Admin / Admin)
    nemesiscode off    → arrêt
  .
- L'exécution des tâches nécessite le moteur agent ohmyagent (dépôt privé),
- à placer dans ~/.nemesiscode/ohmyagent — voir docs/deb-package.md.
+ Le moteur agent opencode est inclus dans /usr/share/nemesiscode/opencode ;
+ aucune installation supplémentaire n'est nécessaire.

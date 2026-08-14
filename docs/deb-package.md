@@ -12,7 +12,7 @@ tourner NemesisCode sur un PC Linux 64 bits, **sans rien installer d'autre** :
 ## Installation
 
 ```bash
-sudo dpkg -i nemesiscode_1.0.0_amd64.deb
+sudo dpkg -i nemesiscode_1.2.0_amd64.deb
 ```
 
 (En cas de dépendance manquante : `sudo apt-get install -f` ne sera pas
@@ -61,9 +61,11 @@ cp chemin/vers/opencode ~/.nemesiscode/opencode
 chmod +x ~/.nemesiscode/opencode
 ```
 
-Emplacements reconnus (dans l'ordre) : `~/.nemesiscode/opencode`,
-`/usr/share/nemesiscode/opencode` (embarqué), `~/.local/bin/opencode`,
-`/usr/local/bin/opencode`, puis le `PATH`.
+Emplacements reconnus (dans l'ordre) : valeur explicite de
+`MCAI_TASKFLOW_LOCAL_AGENT_BIN`, `/usr/share/nemesiscode/opencode` (baseline
+embarqué), `~/.nemesiscode/opencode`, `~/.local/bin/opencode`,
+`/usr/local/bin/opencode`, puis le `PATH`. Chaque candidat est exécuté avec
+`--version` avant sélection ; une ancienne copie AVX qui plante est ignorée.
 
 ### Comment NemesisCode pilote opencode
 
@@ -112,7 +114,7 @@ manuellement si vous voulez tout effacer).
 
 ```bash
 scripts/build-deb.sh          # depuis la racine du dépôt
-# Produit : dist-deb/nemesiscode_1.0.0_amd64.deb
+# Produit : dist-deb/nemesiscode_1.2.0_amd64.deb
 ```
 
 Prérequis : Go 1.25+, Node 22+, pnpm, dpkg-deb. Le binaire est compilé avec

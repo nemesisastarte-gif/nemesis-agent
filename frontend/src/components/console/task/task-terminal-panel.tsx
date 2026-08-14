@@ -14,7 +14,7 @@ import {
 import { useDialogActionNavigation } from "@/components/ui/dialog-action-navigation"
 import { apiRequest } from "@/utils/requestUtils"
 import { IconAlertCircle, IconCloudOff, IconPlus, IconReload, IconTerminal2, IconX } from "@tabler/icons-react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { v4 as uuidv4 } from "uuid"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
@@ -40,6 +40,7 @@ export function TaskTerminalPanel({ envid, disabled, onClosePanel }: TaskTermina
   const [titles, setTitles] = useState<Record<string, string>>({})
   const [closeDialogOpen, setCloseDialogOpen] = useState(false)
   const [sessionToClose, setSessionToClose] = useState<string | null>(null)
+  const autoSessionCreatedRef = useRef(false)
   const closeDialogNavigation = useDialogActionNavigation()
 
   const fetchSessions = useCallback(async (): Promise<DomainTerminal[]> => {
@@ -102,13 +103,31 @@ export function TaskTerminalPanel({ envid, disabled, onClosePanel }: TaskTermina
   }
 
   useEffect(() => {
+    autoSessionCreatedRef.current = false
+  }, [envid])
+
+  useEffect(() => {
     if (!envid || disabled) return
-    fetchSessions()
+    let active = true
+    void fetchSessions().then((existingSessions) => {
+      // À la première ouverture, créer automatiquement un terminal si le
+      // workspace n'en possède aucun. L'ancien écran vide obligeait à trouver
+      // le petit bouton « + » et donnait l'impression que le terminal local
+      // ne fonctionnait pas.
+      if (!active || existingSessions.length > 0 || autoSessionCreatedRef.current) return
+      autoSessionCreatedRef.current = true
+      const newId = uuidv4()
+      setCurrentSessionId(newId)
+      setSignal((prev) => prev + 1)
+    })
+    return () => {
+      active = false
+    }
   }, [disabled, envid, fetchSessions])
 
   useEffect(() => {
     if (connectionStatus === "connected") {
-      fetchSessions()
+      void fetchSessions()
     }
   }, [connectionStatus, fetchSessions])
 
