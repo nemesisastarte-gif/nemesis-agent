@@ -63,6 +63,26 @@ func TestEnsureVMRejectsTraversal(t *testing.T) {
 	}
 }
 
+func TestNewClientMigratesLegacyOhMyAgentToOpenCode(t *testing.T) {
+	binDir := t.TempDir()
+	opencode := filepath.Join(binDir, "opencode")
+	if err := os.WriteFile(opencode, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir)
+
+	client, err := NewClient(config.LocalTaskFlow{
+		WorkspaceRoot: t.TempDir(),
+		AgentBin:      "ohmyagent",
+	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(client.cfg.AgentBin) != "opencode" {
+		t.Fatalf("legacy agent resolved to %q, want opencode", client.cfg.AgentBin)
+	}
+}
+
 func fileMode(t *testing.T, path string) os.FileMode {
 	t.Helper()
 	info, err := os.Stat(path)

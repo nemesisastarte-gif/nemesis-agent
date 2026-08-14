@@ -16,7 +16,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${1:-1.2.0}"
+VERSION="${1:-1.2.1}"
 OUT_DIR="$ROOT/dist-deb"
 STAGE="$OUT_DIR/stage"
 DEB="$OUT_DIR/nemesiscode_${VERSION}_amd64.deb"

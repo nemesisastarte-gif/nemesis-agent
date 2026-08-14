@@ -115,6 +115,7 @@ cmd_on() {
     # resolve_engine a déjà validé une éventuelle surcharge explicite. Utiliser
     # impérativement son résultat pour ne pas réinjecter un ancien binaire AVX.
     export MCAI_TASKFLOW_LOCAL_AGENT_BIN="$engine"
+    echo "    Moteur agent : $engine"
   else
     echo "ℹ️  Moteur opencode non trouvé — l'interface (modèles, tâches) marchera,"
     echo "   mais l'exécution des tâches nécessite le binaire du moteur."
@@ -211,13 +212,15 @@ case "${1:-}" in
   off|stop)  cmd_off ;;
   restart)   cmd_off; cmd_on ;;
   status)    cmd_status ;;
+  engine)    cmd_engine ;;
   logs)      cmd_logs ;;
   *)
-    echo "Usage : nemesiscode {on|off|restart|status|logs}"
+    echo "Usage : nemesiscode {on|off|restart|status|engine|logs}"
     echo
     echo "  on       démarre NemesisCode (frontend + backend) sur http://localhost:$PORT"
     echo "  off      arrête tout"
     echo "  status   état actuel"
+    echo "  engine   chemin du moteur opencode sélectionné"
     echo "  logs     suit les logs du serveur"
     echo
     echo "Variables utiles : NEMESISCODE_PORT (défaut $PORT), MCAI_INIT_TEAM_PASSWORD,"

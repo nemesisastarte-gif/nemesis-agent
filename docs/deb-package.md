@@ -11,14 +11,14 @@ tourner NemesisCode sur un PC Linux 64 bits, **sans rien installer d'autre** :
 
 ## Téléchargement et installation
 
-Le paquet courant est conservé dans `releases/v1.2.0/` et référencé par la
+Le paquet courant est conservé dans `releases/v1.2.1/` et référencé par la
 page **GitHub Releases**. Les anciens paquets non fonctionnels ont été retirés :
 
 ```bash
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.0/releases/v1.2.0/nemesiscode_1.2.0_amd64.deb
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.0/releases/v1.2.0/SHA256SUMS
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.1/releases/v1.2.1/nemesiscode_1.2.1_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.1/releases/v1.2.1/SHA256SUMS
 sha256sum -c SHA256SUMS
-sudo dpkg -i nemesiscode_1.2.0_amd64.deb
+sudo dpkg -i nemesiscode_1.2.1_amd64.deb
 ```
 
 (En cas de dépendance manquante : `sudo apt-get install -f` ne sera pas
@@ -120,7 +120,7 @@ manuellement si vous voulez tout effacer).
 
 ```bash
 scripts/build-deb.sh          # depuis la racine du dépôt
-# Produit : dist-deb/nemesiscode_1.2.0_amd64.deb
+# Produit : dist-deb/nemesiscode_1.2.1_amd64.deb
 ```
 
 Prérequis : Go 1.25+, Node 22+, pnpm, dpkg-deb. Le binaire est compilé avec

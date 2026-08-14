@@ -2,12 +2,9 @@ package local
 
 import (
 	"bufio"
-	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -415,47 +412,6 @@ func (c *Client) streamOpenCode(rec *VM, agent *agentClient) {
 	c.logger.Info("local opencode run finished", "vm_id", rec.record.ID,
 		"err", waitErr, "stream_error", scanErr, "engine_error", sawEngineError)
 
-	taskID := ""
-	rec.mu.Lock()
-	if rec.lastReq != nil {
-		taskID = rec.lastReq.ID.String()
-	}
-	rec.mu.Unlock()
-	// Notifie le backend pour la transition processing → finished/error en DB.
-	if taskID != "" {
-		c.notifyTaskFinished(taskID, success)
-	}
-}
-
-// notifyTaskFinished appelle POST /internal/task-finished (route interne sans
-// auth) pour que la tâche passe à finished (ou error) dans la DB. Fire and
-// forget : l'état final est aussi visible via task-ended dans le stream.
-func (c *Client) notifyTaskFinished(taskID string, success bool) {
-	if c.internalBaseURL == "" {
-		return
-	}
-	body, err := json.Marshal(map[string]any{
-		"task_id": taskID,
-		"success": success,
-	})
-	if err != nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		c.internalBaseURL+"/internal/task-finished", bytes.NewReader(body))
-	if err != nil {
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		c.logger.Warn("task-finished callback failed", "task_id", taskID, "error", err)
-		return
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		c.logger.Warn("task-finished callback non-2xx", "task_id", taskID, "status", resp.StatusCode)
-	}
+	// task-ended termine un tour, pas la conversation. La tâche reste en
+	// processing afin que le navigateur puisse envoyer les tours suivants.
 }

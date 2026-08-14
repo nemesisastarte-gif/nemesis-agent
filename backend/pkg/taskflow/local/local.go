@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -101,6 +102,9 @@ func NewClient(cfg config.LocalTaskFlow, logger *slog.Logger, opts ...func(*Clie
 		shell = "/bin/sh"
 	}
 
+	configuredAgentBin := cfg.AgentBin
+	cfg.AgentBin = resolveLocalAgentBin(configuredAgentBin)
+
 	c := &Client{
 		cfg:      cfg,
 		root:     root,
@@ -113,6 +117,8 @@ func NewClient(cfg config.LocalTaskFlow, logger *slog.Logger, opts ...func(*Clie
 	for _, opt := range opts {
 		opt(c)
 	}
+	c.logger.Info("local opencode engine resolved",
+		"configured", configuredAgentBin, "resolved", c.cfg.AgentBin)
 	// Le registre des VM est en mémoire, mais les workspaces persistent. Les
 	// restaurer au démarrage garde le terminal et l'explorateur utilisables
 	// après `nemesiscode restart`.
@@ -132,6 +138,63 @@ func expandHome(p string) string {
 		return filepath.Join(home, p[2:])
 	}
 	return p
+}
+
+// resolveLocalAgentBin rend le backend autonome par rapport au launcher. Une
+// ancienne configuration 1.x peut encore fournir "ohmyagent" ; comme le
+// driver local parle désormais exclusivement le CLI opencode, cette valeur est
+// ignorée au profit du moteur baseline embarqué dans le paquet.
+func resolveLocalAgentBin(configured string) string {
+	configured = strings.TrimSpace(configured)
+
+	// Une surcharge explicite par chemin garde la priorité si elle existe.
+	if strings.Contains(configured, string(filepath.Separator)) {
+		if candidate := executablePath(configured); candidate != "" {
+			return candidate
+		}
+	}
+	// Un nom de commande personnalisé reste supporté. Les deux anciens
+	// defaults sont traités plus bas pour préférer le baseline du paquet.
+	if configured != "" && configured != "ohmyagent" && configured != "opencode" {
+		if candidate := executablePath(configured); candidate != "" {
+			return candidate
+		}
+	}
+
+	home, _ := os.UserHomeDir()
+	candidates := []string{
+		"/usr/share/nemesiscode/opencode",
+		filepath.Join(home, ".nemesiscode", "opencode"),
+		filepath.Join(home, ".local", "bin", "opencode"),
+		"/usr/local/bin/opencode",
+		"opencode",
+	}
+	for _, candidate := range candidates {
+		if path := executablePath(candidate); path != "" {
+			return path
+		}
+	}
+	// L'erreur de démarrage mentionnera opencode, jamais l'ancien ohmyagent.
+	return "opencode"
+}
+
+func executablePath(candidate string) string {
+	candidate = expandHome(strings.TrimSpace(candidate))
+	if candidate == "" {
+		return ""
+	}
+	if strings.Contains(candidate, string(filepath.Separator)) {
+		info, err := os.Stat(candidate)
+		if err != nil || info.IsDir() || info.Mode().Perm()&0o111 == 0 {
+			return ""
+		}
+		return candidate
+	}
+	path, err := exec.LookPath(candidate)
+	if err != nil {
+		return ""
+	}
+	return path
 }
 
 func (c *Client) restoreWorkspaces() error {
@@ -202,7 +265,7 @@ func (c *Client) ensureVM(id string) (*VM, error) {
 			Cores:         int32(runtime.NumCPU()),
 			TTL:           taskflow.TTL{Kind: taskflow.TTLForever},
 			CreatedAt:     info.ModTime().Unix(),
-			Version:       "nemesis-local-1.2.0",
+			Version:       "nemesis-local-1.2.1",
 		},
 		workspace: ws,
 		live:      NewLiveStream(),
@@ -341,7 +404,7 @@ func (c *Client) hostInfo() *taskflow.Host {
 		Memory:   readMemTotal(),
 		Disk:     readDiskTotal(c.root),
 		TTL:      taskflow.TTL{Kind: taskflow.TTLForever},
-		Version:  "nemesis-local-1.2.0",
+		Version:  "nemesis-local-1.2.1",
 	}
 }
 

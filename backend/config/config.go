@@ -188,14 +188,14 @@ type TaskFlow struct {
 type LocalTaskFlow struct {
 	// WorkspaceRoot 工作区根目录，每个任务一个子目录。空 = ~/.nemesiscode/workspaces
 	WorkspaceRoot string `mapstructure:"workspace_root"`
-	// AgentBin 本机 agent 引擎可执行文件（默认 "ohmyagent"，从 PATH 查找）。
+	// AgentBin moteur opencode local (défaut "opencode", résolu depuis le paquet ou PATH).
 	AgentBin string `mapstructure:"agent_bin"`
 	// AgentArgs 追加给引擎的参数（默认 --task-config <workspace>/nemesis-task.json）。
 	AgentArgs []string `mapstructure:"agent_args"`
 	// Shell 终端 shell（默认 $SHELL，兜底 /bin/sh）。
 	Shell string `mapstructure:"shell"`
-	// PermissionMode mode de permission du moteur ohmyagent
-	// (default/plan/auto/bypassPermissions/yolo). Vide → "yolo" (local = confiance).
+	// PermissionMode mode de permission du moteur opencode.
+	// Vide → "yolo" (local = confiance).
 	PermissionMode string `mapstructure:"permission_mode"`
 	// HostID 本机在宿主列表中的 ID（默认 local-<hostname>）。
 	HostID string `mapstructure:"host_id"`
@@ -345,9 +345,9 @@ type SMTP struct {
 
 type Database struct {
 	// Driver : "postgres" (défaut, historique) ou "sqlite" (mode local sans Docker).
-	Driver          string `mapstructure:"driver"`
-	Master          string `mapstructure:"master"`
-	Slave           string `mapstructure:"slave"`
+	Driver string `mapstructure:"driver"`
+	Master string `mapstructure:"master"`
+	Slave  string `mapstructure:"slave"`
 	// SQLitePath chemin du fichier SQLite (mode driver=sqlite).
 	SQLitePath      string `mapstructure:"sqlite_path"`
 	MaxOpenConns    int    `mapstructure:"max_open_conns"`
@@ -415,7 +415,7 @@ func Init(dir string) (*Config, error) {
 	v.SetDefault("taskflow.grpc_url", "")
 	v.SetDefault("taskflow.mode", "remote")
 	v.SetDefault("taskflow.local.workspace_root", "")
-	v.SetDefault("taskflow.local.agent_bin", "ohmyagent")
+	v.SetDefault("taskflow.local.agent_bin", "opencode")
 	v.SetDefault("taskflow.local.agent_args", []string{})
 	v.SetDefault("taskflow.local.shell", "")
 	v.SetDefault("taskflow.local.permission_mode", "yolo")
