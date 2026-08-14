@@ -284,12 +284,46 @@ func (m *vmManager) IsOnline(ctx context.Context, req *taskflow.IsOnlineReq[stri
 	return &taskflow.IsOnlineResp{OnlineMap: online}, nil
 }
 
+// getVMOrInit retourne le rec de la VM s'il est en mémoire ; sinon il en
+// reconstruit un minimal depuis le workspace sur disque (<root>/<vmID>).
+// Après un redémarrage du backend, le map en mémoire est vide alors que la
+// VM existe encore en DB et son workspace sur disque — le terminal (et la
+// navigation fichiers) doivent continuer à fonctionner.
+func (c *Client) getVMOrInit(vmID string) *VM {
+	if rec := c.getVM(vmID); rec != nil {
+		return rec
+	}
+	ws := filepath.Join(c.root, vmID)
+	if _, err := os.Stat(ws); err != nil {
+		return nil
+	}
+	rec := &VM{
+		record: &taskflow.VirtualMachine{
+			ID:        vmID,
+			HostID:    c.hostID,
+			Name:      "local-" + vmID,
+			Status:    taskflow.VirtualMachineStatusOnline,
+			Version:   "nemesis-local-1.0",
+			CreatedAt: time.Now().Unix(),
+		},
+		workspace: ws,
+		live:      NewLiveStream(),
+		shells:    make(map[string]*Shell),
+		ports:     make(map[string]*taskflow.PortForwardInfo),
+	}
+	c.mu.Lock()
+	c.vms[vmID] = rec
+	c.mu.Unlock()
+	c.logger.Info("local vm re-initialized from disk", "vm_id", vmID, "workspace", ws)
+	return rec
+}
+
 // Terminal ouvre un shell local dans le workspace de la VM.
 // Le ctx est conservé dans le Shell pour que BlockRead se débloque à la
 // déconnexion (sinon le handler ws resterait bloqué et le process jamais
 // stoppé — voir docs/local-mode-design.md).
 func (m *vmManager) Terminal(ctx context.Context, req *taskflow.TerminalReq) (taskflow.Sheller, error) {
-	rec := m.c.getVM(req.ID)
+	rec := m.c.getVMOrInit(req.ID)
 	if rec == nil {
 		return nil, fmt.Errorf("environment not found: %s", req.ID)
 	}
@@ -310,7 +344,7 @@ func (m *vmManager) Reports(ctx context.Context, req taskflow.ReportSubscribeReq
 }
 
 func (m *vmManager) TerminalList(ctx context.Context, id string) ([]*taskflow.Terminal, error) {
-	rec := m.c.getVM(id)
+	rec := m.c.getVMOrInit(id)
 	if rec == nil {
 		return nil, fmt.Errorf("environment not found: %s", id)
 	}

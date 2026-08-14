@@ -2,11 +2,15 @@ package local
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -227,9 +231,13 @@ func openCodeLineToChunks(line []byte) []*taskflow.TaskChunk {
 		if msg == "" {
 			msg = "opencode error"
 		}
+		// Format frontend : le composant error_message lit data.details.
 		return []*taskflow.TaskChunk{{
 			Event: "task-error",
-			Data:  rawJSON(map[string]any{"error": map[string]any{"message": msg}}),
+			Data: rawJSON(map[string]any{
+				"details": msg,
+				"error":   map[string]any{"message": msg},
+			}),
 		}}
 
 	default:
@@ -282,7 +290,15 @@ func (c *Client) streamOpenCode(rec *VM, agent *agentClient) {
 		return // Cancel a déjà publié task-ended cancelled
 	}
 
-	if waitErr == nil {
+	success := waitErr == nil
+	taskID := ""
+	rec.mu.Lock()
+	if rec.lastReq != nil {
+		taskID = rec.lastReq.ID.String()
+	}
+	rec.mu.Unlock()
+
+	if success {
 		rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: "success"})
 	} else {
 		msg := "opencode failed"
@@ -291,11 +307,79 @@ func (c *Client) streamOpenCode(rec *VM, agent *agentClient) {
 		} else {
 			msg = fmt.Sprintf("opencode failed: %v", waitErr)
 		}
+		// En cas de sortie anormale sans event error sur stdout (crash au
+		// démarrage, config invalide…), on joint la fin du log opencode pour
+		// que l'erreur affichée dans l'UI soit exploitable.
+		if tail := tailFile(filepath.Join(engineDirFor(rec.workspace), "opencode.log"), 8); tail != "" {
+			msg += "\n" + tail
+		}
 		rec.live.Publish(&taskflow.TaskChunk{
 			Event: "task-error",
-			Data:  rawJSON(map[string]any{"error": map[string]any{"message": msg}}),
+			Data: rawJSON(map[string]any{
+				"details": msg,
+				"error":   map[string]any{"message": msg},
+			}),
 		})
 		rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: "failed"})
 	}
 	c.logger.Info("local opencode run finished", "vm_id", rec.record.ID, "err", waitErr)
+
+	// Notifie le backend pour la transition processing → finished/error en DB
+	// (même contrat que la fin de tour notifiée par le taskflow cloud).
+	if taskID != "" {
+		c.notifyTaskFinished(taskID, success)
+	}
+}
+
+// notifyTaskFinished appelle POST /internal/task-finished (route interne sans
+// auth) pour que la tâche passe à finished (ou error) dans la DB. Fire and
+// forget : l'état final est aussi visible via task-ended dans le stream.
+func (c *Client) notifyTaskFinished(taskID string, success bool) {
+	if c.internalBaseURL == "" {
+		return
+	}
+	body, err := json.Marshal(map[string]any{
+		"task_id": taskID,
+		"success": success,
+	})
+	if err != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		c.internalBaseURL+"/internal/task-finished", bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		c.logger.Warn("task-finished callback failed", "task_id", taskID, "error", err)
+		return
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		c.logger.Warn("task-finished callback non-2xx", "task_id", taskID, "status", resp.StatusCode)
+	}
+}
+
+// tailFile retourne les n dernières lignes d'un fichier (utile pour joindre
+// le log du moteur à un message d'erreur).
+func tailFile(path string, n int) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	lines := make([]string, 0, n)
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		lines = append(lines, sc.Text())
+		if len(lines) > n {
+			lines = lines[1:]
+		}
+	}
+	return strings.Join(lines, "\n")
 }

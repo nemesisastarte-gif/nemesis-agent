@@ -32,6 +32,7 @@ export const ErrorMessageItem = ({ message }: { message: MessageType }) => {
 
         <div className="flex flex-row gap-2 items-center">
           <p className="text-sm text-muted-foreground flex-1">{t("taskDetail.error.repairTip")}</p>
+          {message.onReloadSession && (
           <Button
             variant="default"
             size="sm"
@@ -66,6 +67,7 @@ export const ErrorMessageItem = ({ message }: { message: MessageType }) => {
             <IconReload className={repairing ? "size-3 mr-1 animate-spin" : "size-3 mr-1"} />
             {repairing ? t("taskDetail.error.repairing") : t("taskDetail.error.repair")}
           </Button>
+          )}
         </div>
       </HoverCardContent>
     </HoverCard>

@@ -22,6 +22,7 @@ import (
 	"github.com/teteekoue/NemesisCode/backend/db"
 	"github.com/teteekoue/NemesisCode/backend/domain"
 	etypes "github.com/teteekoue/NemesisCode/backend/ent/types"
+	"github.com/teteekoue/NemesisCode/backend/errcode"
 	"github.com/teteekoue/NemesisCode/backend/pkg/cvt"
 	"github.com/teteekoue/NemesisCode/backend/pkg/entx"
 	"github.com/teteekoue/NemesisCode/backend/pkg/lifecycle"
@@ -105,8 +106,40 @@ func NewInternalHostHandler(i *do.Injector) (*InternalHostHandler, error) {
 	g.POST("/vm/activity", web.BindHandler(h.VMActivity))
 	g.POST("/task-log-store", web.BindHandler(h.GetTaskLogStore))
 	g.POST("/task-stream-ips", web.BindHandler(h.GetTaskStreamIPs))
+	g.POST("/task-finished", web.BindHandler(h.TaskFinished))
 
 	return h, nil
+}
+
+// TaskFinishedReq signale la fin d'exécution d'une tâche (mode local : le
+// moteur opencode s'est arrêté tout seul).
+type TaskFinishedReq struct {
+	TaskID  string `json:"task_id"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// TaskFinished transitionne la tâche vers finished (ou error) — même contrat
+// que la notification de fin du taskflow cloud, qui passait par
+// /internal/task/stop. En mode local c'est le driver du moteur qui l'appelle.
+func (h *InternalHostHandler) TaskFinished(c *web.Context, req TaskFinishedReq) error {
+	tid, err := uuid.Parse(req.TaskID)
+	if err != nil || tid == uuid.Nil {
+		return errcode.ErrBadRequest.Wrap(fmt.Errorf("invalid task_id: %q", req.TaskID))
+	}
+	to := consts.TaskStatusFinished
+	if !req.Success {
+		to = consts.TaskStatusError
+	}
+	if err := h.taskLifecycle.Transition(c.Request().Context(), tid, to, lifecycle.TaskMetadata{
+		TaskID: tid,
+	}); err != nil {
+		// Transition déjà faite (fin déjà notifiée, tâche annulée…) : pas une
+		// erreur bloquante — la tâche est déjà dans un état terminal.
+		h.logger.WarnContext(c.Request().Context(), "task-finished transition skipped",
+			"task_id", req.TaskID, "to", to, "error", err)
+	}
+	return c.Success(nil)
 }
 
 type VMActivityReq struct {
