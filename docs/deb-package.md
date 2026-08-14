@@ -11,12 +11,12 @@ tourner NemesisCode sur un PC Linux 64 bits, **sans rien installer d'autre** :
 
 ## Téléchargement et installation
 
-Les paquets compilés sont stockés dans **GitHub Releases** afin de ne pas
-alourdir l'historique Git du code source :
+Le paquet courant est conservé dans `releases/v1.2.0/` et référencé par la
+page **GitHub Releases**. Les anciens paquets non fonctionnels ont été retirés :
 
 ```bash
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/releases/latest/download/nemesiscode_1.2.0_amd64.deb
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/releases/latest/download/SHA256SUMS
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.0/releases/v1.2.0/nemesiscode_1.2.0_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.0/releases/v1.2.0/SHA256SUMS
 sha256sum -c SHA256SUMS
 sudo dpkg -i nemesiscode_1.2.0_amd64.deb
 ```

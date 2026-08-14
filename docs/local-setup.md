@@ -12,8 +12,8 @@ dépendance glibc, SQLite 100% Go), frontend compilé servi par le backend,
 Redis intégré. **Aucune installation supplémentaire.**
 
 ```bash
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/releases/latest/download/nemesiscode_1.2.0_amd64.deb
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/releases/latest/download/SHA256SUMS
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.0/releases/v1.2.0/nemesiscode_1.2.0_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.0/releases/v1.2.0/SHA256SUMS
 sha256sum -c SHA256SUMS
 sudo dpkg -i nemesiscode_1.2.0_amd64.deb
 nemesiscode on       # → http://localhost:5000  (Admin / Admin)
