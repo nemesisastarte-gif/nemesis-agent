@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -89,6 +90,9 @@ func (m *vmManager) Create(ctx context.Context, req *taskflow.CreateVirtualMachi
 // tâche, alors que la machine à états (Redis) n'a pas encore enregistré la
 // transition "" → pending — la première tentative peut donc échouer. Les
 // appels suivants sont idempotents (ignorés une fois la tâche processing).
+//
+// NB : le framework web renvoie HTTP 200 même en cas d'échec métier — on
+// vérifie donc aussi le corps JSON {code: ≠0}.
 func (c *Client) notifyVMReady(vm *taskflow.VirtualMachine) {
 	if c.internalBaseURL == "" {
 		return
@@ -112,17 +116,33 @@ func (c *Client) notifyVMReady(vm *taskflow.VirtualMachine) {
 		}
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := http.DefaultClient.Do(req)
-		cancel()
-		if err != nil {
-			c.logger.Warn("vm-ready callback failed", "vm_id", vm.ID, "error", err, "attempt", i)
-		} else {
+		var body []byte
+		if resp != nil {
+			body, _ = io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
-			if resp.StatusCode < 300 {
-				c.logger.Info("vm-ready callback ok", "vm_id", vm.ID, "attempt", i)
-				return
-			}
-			c.logger.Warn("vm-ready callback non-2xx", "vm_id", vm.ID, "status", resp.StatusCode, "attempt", i)
 		}
+		cancel()
+
+		ok := err == nil && resp != nil && resp.StatusCode < 300
+		if ok {
+			// Échec métier : le framework répond 200 avec {code:≠0}.
+			var r struct {
+				Code int `json:"code"`
+			}
+			if json.Unmarshal(body, &r) == nil && r.Code != 0 {
+				ok = false
+			}
+		}
+		if ok {
+			c.logger.Info("vm-ready callback ok", "vm_id", vm.ID, "attempt", i)
+			return
+		}
+		status := 0
+		if resp != nil {
+			status = resp.StatusCode
+		}
+		c.logger.Warn("vm-ready callback failed", "vm_id", vm.ID,
+			"status", status, "body", strings.TrimSpace(string(body)), "attempt", i)
 		if i < attempts {
 			time.Sleep(interval)
 		}

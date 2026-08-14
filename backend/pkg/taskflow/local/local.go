@@ -16,7 +16,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/teteekoue/NemesisCode/backend/config"
 	"github.com/teteekoue/NemesisCode/backend/pkg/taskflow"
@@ -29,14 +28,15 @@ type VM struct {
 	userID    string
 	workspace string
 	repoURL   string
-	// agent : client JSON-RPC du vrai moteur ohmyagent (--stdio).
+	// agent : processus `opencode run` du vrai moteur opencode (ou nil).
 	agent *agentClient
-	// sessionID : session moteur active (session/create).
-	sessionID string
-	live      *LiveStream
-	shells    map[string]*Shell
-	ports     map[string]*taskflow.PortForwardInfo
-	lastReq   *taskflow.CreateTaskReq
+	// stopped : arrêt volontaire (Cancel) — la fin du process ne doit alors
+	// pas publier task-ended (déjà publié par Cancel).
+	stopped bool
+	live    *LiveStream
+	shells  map[string]*Shell
+	ports   map[string]*taskflow.PortForwardInfo
+	lastReq *taskflow.CreateTaskReq
 }
 
 // Client 实现 taskflow.Clienter。
@@ -202,23 +202,16 @@ func (c *Client) getVMByTask(taskID string) *VM {
 	return nil
 }
 
-// stopAgent 停止 agent 进程（destroy 会话 + SIGINT 优雅，3s 后 SIGKILL）。
-// 返回是否确实有进程在跑。
+// stopAgent arrête le processus opencode en cours (SIGTERM au groupe, 3 s
+// de grâce puis SIGKILL). Retourne vrai s'il y avait bien un processus.
+// Ne touche pas à rec.stopped (géré par Cancel).
 func (c *Client) stopAgent(rec *VM) bool {
 	rec.mu.Lock()
 	ag := rec.agent
 	rec.agent = nil
-	sid := rec.sessionID
-	rec.sessionID = ""
 	rec.mu.Unlock()
 	if ag == nil {
 		return false
-	}
-	// destroy 会话 d'abord (grace), puis SIGINT.
-	if sid != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		_, _ = ag.call(ctx, "session/destroy", map[string]any{"session_id": sid})
-		cancel()
 	}
 	ag.close()
 	return true

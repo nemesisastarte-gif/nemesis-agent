@@ -36,6 +36,25 @@ echo "==> [2/4] Backend (binaire statique, GOAMD64=v1)…"
   -trimpath -buildvcs=false \
   -ldflags "-s -w -X main.version=${VERSION}" -o "$OUT_DIR/nemesiscode-server" ./cmd/server)
 
+echo "==> [2b/4] Moteur opencode (binaire baseline x64 — vieux CPU, SSE2)…"
+# opencode (https://github.com/anomalyco/opencode) est distribué sur npm :
+# le paquet opencode-linux-x64-baseline contient le binaire compilé pour
+# x86-64 sans exigence AVX (baseline). Même version que le CLI opencode-ai.
+OC_DIR="$OUT_DIR/opencode"
+mkdir -p "$OC_DIR"
+echo '{"name":"opencode-embed","version":"1.0.0","private":true}' > "$OC_DIR/package.json"
+OC_VER="$(npm view opencode-ai version 2>/dev/null || echo latest)"
+(cd "$OC_DIR" && npm install --no-audit --no-fund \
+  "opencode-ai@$OC_VER" "opencode-linux-x64-baseline@$OC_VER" >/dev/null 2>&1)
+if [ ! -x "$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" ]; then
+  # Fallback : binaire x64 standard
+  (cd "$OC_DIR" && npm install --no-save --no-audit --no-fund \
+    "opencode-ai@$OC_VER" "opencode-linux-x64@$OC_VER" >/dev/null 2>&1)
+fi
+"$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" --version 2>/dev/null \
+  || "$OC_DIR/node_modules/opencode-linux-x64/bin/opencode" --version 2>/dev/null \
+  || { echo "❌ impossible d'obtenir le binaire opencode (npm)." >&2; exit 1; }
+
 echo "==> [3/4] Assemblage du paquet…"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/DEBIAN"
@@ -46,6 +65,13 @@ mkdir -p "$STAGE/usr/share/doc/nemesiscode"
 sed "s/^Version: .*/Version: $VERSION/" "$ROOT/packaging/deb/DEBIAN/control" > "$STAGE/DEBIAN/control"
 install -m 0755 "$ROOT/packaging/deb/usr/bin/nemesiscode" "$STAGE/usr/bin/nemesiscode"
 install -m 0755 "$OUT_DIR/nemesiscode-server" "$STAGE/usr/share/nemesiscode/nemesiscode-server"
+if [ -x "$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" ]; then
+  install -m 0755 "$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" \
+    "$STAGE/usr/share/nemesiscode/opencode"
+else
+  install -m 0755 "$OC_DIR/node_modules/opencode-linux-x64/bin/opencode" \
+    "$STAGE/usr/share/nemesiscode/opencode"
+fi
 cp -a "$ROOT/frontend/dist/." "$STAGE/usr/share/nemesiscode/web/"
 install -m 0644 "$ROOT/docs/deb-package.md" "$STAGE/usr/share/doc/nemesiscode/README.md"
 gzip -9n -c "$ROOT/docs/deb-package.md" > "$STAGE/usr/share/doc/nemesiscode/README.md.gz" 2>/dev/null || true
@@ -53,9 +79,10 @@ rm -f "$STAGE/usr/share/doc/nemesiscode/README.md"
 
 echo "==> [4/4] dpkg-deb…"
 dpkg-deb --root-owner-group --build "$STAGE" "$DEB"
-rm -rf "$STAGE" "$OUT_DIR/nemesiscode-server"
+rm -rf "$STAGE" "$OUT_DIR/nemesiscode-server" "$OC_DIR"
 
 echo
 echo "✅ Paquet créé : $DEB"
 echo "   Installation : sudo dpkg -i $DEB"
 echo "   Puis : nemesiscode on  →  http://localhost:5000  (Admin / Admin)"
+echo "   Moteur agent opencode EMBARQUÉ (aucune installation requise)."

@@ -147,7 +147,7 @@ Variables utiles du mode local (préfixe `MCAI_`) :
 |---|---|---|
 | `MCAI_TASKFLOW_MODE` | `remote` | `local` pour utiliser la machine hôte comme environnement |
 | `MCAI_TASKFLOW_LOCAL_WORKSPACE_ROOT` | `~/.nemesiscode/workspaces` | racine des espaces de travail |
-| `MCAI_TASKFLOW_LOCAL_AGENT_BIN` | `ohmyagent` | binaire du moteur agent |
+| `MCAI_TASKFLOW_LOCAL_AGENT_BIN` | `opencode` | binaire du moteur agent |
 | `MCAI_TASKFLOW_LOCAL_SHELL` | `$SHELL` | shell des terminaux web |
 | `MCAI_TASKFLOW_LOCAL_HOST_ID` | `local-<hostname>` | identifiant de l'hôte local |
 
@@ -190,7 +190,7 @@ l'administrateur) permet de :
 | `desktop/` | Tauri (Rust) + React | Client desktop |
 | `mobile/` | React Native / Expo | Applications mobiles |
 | `browser-extension/` | TypeScript | Extension navigateur |
-| `agent/` | sous-module (upstream privé) | Moteur agent `ohmyagent` |
+| — | — | Moteur agent **opencode** embarqué dans le .deb |
 | `docs/` | Markdown | Documentation (voir [docs/README.md](./docs/README.md)) |
 
 ## Documentation
@@ -207,7 +207,7 @@ l'administrateur) permet de :
 - [x] Providers d'API configurables (NVIDIA NIM, Fireworks, Cohere, Custom…)
 - [ ] SQLite + Redis optionnel (machine nue type Termux, sans Docker)
 - [ ] Scripts de lancement one-shot et installation Termux/Linux
-- [ ] Alignement du protocole agent (`ohmyagent`) en mode local
+- [x] Moteur agent opencode piloté en mode local (opencode run --format json)
 - [ ] Déploiement auto-hébergé de l'équipe
 
 ## Licence

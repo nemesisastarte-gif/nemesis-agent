@@ -111,34 +111,28 @@ TARGET=http://127.0.0.1:8888 pnpm run dev:offline -- --host 0.0.0.0 --port 5173
 5. Le **terminal**, les **fichiers** et les **diffs** de l'interface web
    agissent directement sur la machine hôte.
 
-## Obtenir le vrai moteur ohmyagent
+## Le moteur agent : opencode (embarqué dans le .deb)
 
-Le mode local pilote le **vrai moteur** `ohmyagent` (protocole `--stdio`
-JSON-RPC) — aucune réimplémentation. Le code source est référencé par le
-sous-module `agent/` (dépôt `chaitin/OhMyAgent`, privé).
+Le moteur d'exécution des tâches est **opencode** (https://github.com/anomalyco/opencode,
+MIT) — l'agent de codage open source d'origine de ce projet. Le paquet .deb
+`nemesiscode_*_amd64.deb` **embarque le binaire** (variante « baseline »
+compatible vieux processeurs : SSE2 suffit, aucun AVX requis) : aucune
+installation supplémentaire. En mode développement (sans .deb), le backend
+cherche `opencode` dans le PATH ou via `MCAI_TASKFLOW_LOCAL_AGENT_BIN`.
 
-```bash
-# 1. Récupérer le code du moteur (nécessite l'accès au dépôt privé)
-git submodule update --init agent
-export OHMYAGENT_SRC="$PWD/agent"
+Contrat piloté par le backend :
 
-# 2. Compiler le moteur (le dépôt fournit son propre make — cf. desktop/README)
-cd "$OHMYAGENT_SRC" && make   # produit bin/ohmyagent
-
-# 3. Le rendre visible du backend
-export MCAI_TASKFLOW_LOCAL_AGENT_BIN="$OHMYAGENT_SRC/bin/ohmyagent"
-# (ou placer le binaire dans le PATH)
+```text
+opencode run --format json --auto [--continue] --model nemesiscode-ai/<modèle> "<message>"
 ```
 
-Le backend cherche le binaire dans l'ordre :
-`MCAI_TASKFLOW_LOCAL_AGENT_BIN` (défaut `ohmyagent`) → PATH.
-S'il est absent, la création de tâche échoue avec un message clair
-(`start ohmyagent: executable file not found`).
+- `--format json` : événements NDJSON → événements ACP du frontend ;
+- `--auto` : auto-approve les permissions (mode local « confiance ») ;
+- `--continue` : reprise de la session du workspace (flux « continuer ») ;
+- config LLM : `<workspace>/opencode.json` écrit par le backend
+  (provider `nemesiscode-ai` → base_url + api_key du modèle de l'UI).
 
-Contrat exact (handshake `system/ready`, `session/create`,
-`session/sendMessage`, notifications `event/stream` → chunks ACP,
-`permission/request` auto-approuvé, `turn/stopped` → fin) :
-[docs/local-mode-design.md](./local-mode-design.md).
+Détails : [docs/deb-package-engine.md](./deb-package-engine.md).
 
 ## Variables utiles
 
@@ -149,7 +143,7 @@ Contrat exact (handshake `system/ready`, `session/create`,
 | `MCAI_DATABASE_SQLITE_PATH` | `~/.nemesiscode/nemesiscode.db` | chemin de la base SQLite |
 | `MCAI_REDIS_HOST` | (vide) | vide = Redis en mémoire intégré |
 | `MCAI_TASKFLOW_LOCAL_WORKSPACE_ROOT` | `~/.nemesiscode/workspaces` | racine des espaces de travail |
-| `MCAI_TASKFLOW_LOCAL_AGENT_BIN` | `ohmyagent` | binaire du moteur agent |
+| `MCAI_TASKFLOW_LOCAL_AGENT_BIN` | `opencode` | binaire du moteur agent |
 | `MCAI_TASKFLOW_LOCAL_SHELL` | `$SHELL` | shell des terminaux web |
 | `MCAI_INIT_TEAM_EMAIL` / `PASSWORD` | `Admin` / `Admin` | compte initial (admin, propriétaire de l'hôte local) |
 | `MCAI_INIT_TEAM_IMAGE` | `local-env` | image d'environnement par défaut |

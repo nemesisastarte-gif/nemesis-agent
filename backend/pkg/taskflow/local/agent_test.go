@@ -5,9 +5,10 @@ import (
 	"testing"
 )
 
-// TestEngineEventToChunk vérifie le mapping des notifications du vrai moteur
-// ohmyagent (protocole --stdio) vers les TaskChunk ACP attendus par le
-// frontend web.
+// Tests du mapping des événements NDJSON du VRAI moteur opencode
+// (`opencode run --format json`) vers les TaskChunk ACP attendus par le
+// frontend web. Les formes de ligne sont celles observées avec le binaire
+// réel v1.18.x.
 
 func decodeACPData(t *testing.T, chunkData []byte) map[string]any {
 	t.Helper()
@@ -20,11 +21,9 @@ func decodeACPData(t *testing.T, chunkData []byte) map[string]any {
 	return v
 }
 
-func TestEngineEventToChunkModelDelta(t *testing.T) {
-	chunks := engineEventToChunk(engineEvent{
-		Method: "event/stream",
-		Params: json.RawMessage(`{"type":"model_delta","session_id":"s1","data":{"text":"Bonjour "}}`),
-	})
+func TestOpenCodeLineText(t *testing.T) {
+	line := `{"type":"text","timestamp":1,"sessionID":"s1","part":{"type":"text","text":"Bonjour depuis le moteur !"}}`
+	chunks := openCodeLineToChunks([]byte(line))
 	if len(chunks) != 1 {
 		t.Fatalf("expected 1 chunk, got %d", len(chunks))
 	}
@@ -41,16 +40,14 @@ func TestEngineEventToChunkModelDelta(t *testing.T) {
 		t.Fatalf("unexpected sessionUpdate: %v", update["sessionUpdate"])
 	}
 	content := update["content"].(map[string]any)
-	if content["type"] != "text" || content["text"] != "Bonjour " {
+	if content["type"] != "text" || content["text"] != "Bonjour depuis le moteur !" {
 		t.Fatalf("unexpected content: %+v", content)
 	}
 }
 
-func TestEngineEventToChunkThinkingDelta(t *testing.T) {
-	chunks := engineEventToChunk(engineEvent{
-		Method: "event/stream",
-		Params: json.RawMessage(`{"type":"thinking_delta","session_id":"s1","data":{"text":"réfléchir…"}}`),
-	})
+func TestOpenCodeLineReasoning(t *testing.T) {
+	line := `{"type":"reasoning","timestamp":1,"sessionID":"s1","part":{"type":"reasoning","text":"réfléchir…"}}`
+	chunks := openCodeLineToChunks([]byte(line))
 	if len(chunks) != 1 {
 		t.Fatalf("expected 1 chunk, got %d", len(chunks))
 	}
@@ -61,83 +58,72 @@ func TestEngineEventToChunkThinkingDelta(t *testing.T) {
 	}
 }
 
-func TestEngineEventToChunkToolCall(t *testing.T) {
-	chunks := engineEventToChunk(engineEvent{
-		Method: "event/stream",
-		Params: json.RawMessage(`{"type":"tool_call","session_id":"s1","data":{"tool_call_id":"tc-1","title":"Bash","input":{"command":"ls"}}}`),
-	})
-	if len(chunks) != 1 {
-		t.Fatalf("expected 1 chunk, got %d", len(chunks))
+func TestOpenCodeLineToolUse(t *testing.T) {
+	// Forme réelle observée avec le binaire opencode (v1.18.x).
+	line := `{"type":"tool_use","timestamp":1,"sessionID":"s1","part":{` +
+		`"type":"tool","tool":"bash","callID":"call_1",` +
+		`"state":{"status":"completed","input":{"command":"ls"},"output":"(no output)",` +
+		`"metadata":{"exit":0},"title":"ls"}}}`
+	chunks := openCodeLineToChunks([]byte(line))
+	if len(chunks) != 2 {
+		t.Fatalf("expected 2 chunks (tool_call + update), got %d", len(chunks))
 	}
-	payload := decodeACPData(t, chunks[0].Data)
-	update := payload["update"].(map[string]any)
-	if update["sessionUpdate"] != "tool_call" {
-		t.Fatalf("unexpected sessionUpdate: %v", update["sessionUpdate"])
+	first := decodeACPData(t, chunks[0].Data)
+	upd := first["update"].(map[string]any)
+	if upd["sessionUpdate"] != "tool_call" {
+		t.Fatalf("unexpected first sessionUpdate: %v", upd["sessionUpdate"])
 	}
-	if update["toolCallId"] != "tc-1" || update["title"] != "Bash" {
-		t.Fatalf("unexpected tool call: %+v", update)
+	if upd["toolCallId"] != "call_1" || upd["title"] != "ls" || upd["status"] != "in_progress" {
+		t.Fatalf("unexpected tool call: %+v", upd)
 	}
-	if update["status"] != "in_progress" {
-		t.Fatalf("unexpected status: %v", update["status"])
+	if upd["rawInput"] == nil {
+		t.Fatalf("rawInput missing: %+v", upd)
+	}
+
+	second := decodeACPData(t, chunks[1].Data)
+	upd2 := second["update"].(map[string]any)
+	if upd2["sessionUpdate"] != "tool_call_update" || upd2["toolCallId"] != "call_1" ||
+		upd2["status"] != "completed" {
+		t.Fatalf("unexpected tool update: %+v", upd2)
 	}
 }
 
-func TestEngineEventToChunkToolResult(t *testing.T) {
-	chunks := engineEventToChunk(engineEvent{
-		Method: "event/stream",
-		Params: json.RawMessage(`{"type":"tool_result","session_id":"s1","data":{"tool_call_id":"tc-1","output":"file1","status":"success"}}`),
-	})
-	if len(chunks) != 1 {
-		t.Fatalf("expected 1 chunk, got %d", len(chunks))
-	}
-	payload := decodeACPData(t, chunks[0].Data)
-	update := payload["update"].(map[string]any)
-	if update["sessionUpdate"] != "tool_call_update" || update["toolCallId"] != "tc-1" {
-		t.Fatalf("unexpected tool result: %+v", update)
-	}
-}
-
-func TestEngineEventToChunkError(t *testing.T) {
-	// Erreur transitoire → aucun chunk (le moteur réessaie).
-	chunks := engineEventToChunk(engineEvent{
-		Method: "event/stream",
-		Params: json.RawMessage(`{"type":"error","session_id":"s1","data":{"kind":"transient_retry","error":"timeout"}}`),
-	})
-	if len(chunks) != 0 {
-		t.Fatalf("transient error should produce no chunk, got %d", len(chunks))
-	}
-	// Erreur terminale → task-error.
-	chunks = engineEventToChunk(engineEvent{
-		Method: "event/stream",
-		Params: json.RawMessage(`{"type":"error","session_id":"s1","data":{"error":"boom"}}`),
-	})
+func TestOpenCodeLineError(t *testing.T) {
+	// Forme réelle : {"type":"error","error":{"name":"APIError","data":{"message":"..."}}}.
+	line := `{"type":"error","timestamp":1,"sessionID":"s1","error":{"name":"APIError","data":{"message":"Cannot connect to API"}}}`
+	chunks := openCodeLineToChunks([]byte(line))
 	if len(chunks) != 1 || chunks[0].Event != "task-error" {
 		t.Fatalf("expected task-error chunk, got %+v", chunks)
 	}
-}
-
-func TestEngineEventToChunkUserMessageIgnored(t *testing.T) {
-	chunks := engineEventToChunk(engineEvent{
-		Method: "event/stream",
-		Params: json.RawMessage(`{"type":"user_message","session_id":"s1","data":{}}`),
-	})
-	if len(chunks) != 0 {
-		t.Fatalf("user_message should produce no chunk, got %d", len(chunks))
+	payload := decodeACPData(t, chunks[0].Data)
+	errObj := payload["error"].(map[string]any)
+	if errObj["message"] != "Cannot connect to API" {
+		t.Fatalf("unexpected error message: %+v", errObj)
 	}
 }
 
-func TestAgentSessionCreateParams(t *testing.T) {
-	// Vérifie la construction des paramètres session/create (proto réel).
-	params := map[string]any{
-		"cwd":             "/ws",
-		"permission_mode": "yolo",
-		"interactive":     true,
-		"model":           "gpt-4o",
+func TestOpenCodeLineIgnored(t *testing.T) {
+	// step_start / step_finish / lignes non JSON → aucun chunk UI.
+	for _, line := range []string{
+		`{"type":"step_start","timestamp":1,"sessionID":"s1","part":{"type":"step-start"}}`,
+		`{"type":"step_finish","timestamp":1,"sessionID":"s1","part":{"type":"step-finish","reason":"stop"}}`,
+		`pas du json`,
+	} {
+		if chunks := openCodeLineToChunks([]byte(line)); len(chunks) != 0 {
+			t.Fatalf("line %q should produce no chunk, got %d", line, len(chunks))
+		}
 	}
-	b, _ := json.Marshal(params)
-	var p map[string]any
-	_ = json.Unmarshal(b, &p)
-	if p["cwd"] != "/ws" || p["permission_mode"] != "yolo" || p["interactive"] != true || p["model"] != "gpt-4o" {
-		t.Fatalf("unexpected params: %+v", p)
+}
+
+func TestOpenCodeArgs(t *testing.T) {
+	// Vérifie la construction des arguments de `opencode run` (comme dans
+	// spawnAgent : --format json --auto --model nemesiscode-ai/<model>).
+	args := []string{"run", "--format", "json", "--auto"}
+	args = append(args, "--model", "nemesiscode-ai/test-model")
+	args = append(args, "Crée un fichier hello.txt")
+	want := `["run","--format","json","--auto","--model","nemesiscode-ai/test-model","Crée un fichier hello.txt"]`
+	got, _ := json.Marshal(args)
+	if string(got) != want {
+		t.Fatalf("args mismatch:\n got %s\nwant %s", got, want)
 	}
 }

@@ -41,15 +41,17 @@ port_busy() {
 }
 
 resolve_engine() {
-  # Le moteur ohmyagent est OPTIONNEL au démarrage (fourni séparément, dépôt
-  # privé). S'il est présent à un emplacement connu, on le branche.
+  # Le moteur agent (opencode) est EMBARQUÉ dans le paquet
+  # (/usr/share/nemesiscode/opencode). On accepte aussi un binaire fourni
+  # par l'utilisateur (dépôt officiel : https://github.com/anomalyco/opencode).
   local cand
   for cand in \
-    "$STATE_DIR/ohmyagent" \
-    /usr/share/nemesiscode/ohmyagent \
-    "$HOME/.local/bin/ohmyagent" \
-    /usr/local/bin/ohmyagent; do
-    if [ -x "$cand" ]; then
+    "$STATE_DIR/opencode" \
+    /usr/share/nemesiscode/opencode \
+    "$HOME/.local/bin/opencode" \
+    /usr/local/bin/opencode \
+    "$(command -v opencode 2>/dev/null || true)"; do
+    if [ -n "$cand" ] && [ -x "$cand" ]; then
       echo "$cand"
       return 0
     fi
@@ -98,9 +100,9 @@ cmd_on() {
   if engine="$(resolve_engine)"; then
     export MCAI_TASKFLOW_LOCAL_AGENT_BIN="${MCAI_TASKFLOW_LOCAL_AGENT_BIN:-$engine}"
   else
-    echo "ℹ️  Moteur ohmyagent non trouvé — l'interface (modèles, tâches) marchera,"
+    echo "ℹ️  Moteur opencode non trouvé — l'interface (modèles, tâches) marchera,"
     echo "   mais l'exécution des tâches nécessite le binaire du moteur."
-    echo "   Placez-le dans ~/.nemesiscode/ohmyagent (voir docs/deb-package.md)."
+    echo "   Placez-le dans ~/.nemesiscode/opencode (voir docs/deb-package.md)."
   fi
 
   echo "==> Démarrage de NemesisCode (port $PORT)…"
@@ -165,6 +167,21 @@ cmd_status() {
   else
     echo "⏹  NemesisCode : arrêté"
   fi
+  if engine="$(resolve_engine)"; then
+    echo "   ⚙️  Moteur agent (opencode) : $engine"
+  else
+    echo "   ⚠️  Moteur agent : NON trouvé (tâches non exécutables)."
+    echo "       Placez opencode dans ~/.nemesiscode/opencode — voir docs/deb-package.md"
+  fi
+}
+
+cmd_engine() {
+  if engine="$(resolve_engine)"; then
+    echo "$engine"
+  else
+    echo "non trouvé — placez le binaire dans ~/.nemesiscode/opencode" >&2
+    return 1
+  fi
 }
 
 cmd_logs() {
@@ -186,7 +203,7 @@ case "${1:-}" in
     echo "  logs     suit les logs du serveur"
     echo
     echo "Variables utiles : NEMESISCODE_PORT (défaut $PORT), MCAI_INIT_TEAM_PASSWORD,"
-    echo "MCAI_TASKFLOW_LOCAL_AGENT_BIN (binaire du moteur ohmyagent)."
+    echo "MCAI_TASKFLOW_LOCAL_AGENT_BIN (binaire du moteur opencode)."
     exit 1
     ;;
 esac

@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/teteekoue/NemesisCode/backend/pkg/taskflow"
 )
@@ -22,19 +21,16 @@ type taskManager struct{ c *Client }
 var _ taskflow.TaskManager = (*taskManager)(nil)
 
 // engineDirFor retourne le répertoire privé du moteur pour une tâche :
-// <workspace>/.ohmyagent (config, sessions, logs du moteur).
+// <workspace>/.opencode (logs du moteur opencode).
 func engineDirFor(ws string) string {
-	return filepath.Join(ws, ".ohmyagent")
+	return filepath.Join(ws, ".opencode")
 }
 
-// Create prépare le workspace puis démarre le VRAI moteur ohmyagent :
+// Create prépare le workspace puis démarre le VRAI moteur opencode :
 //
-//	$NEMESIS_AGENT_BIN --stdio            (JSON-RPC ligne par ligne)
-//	  env  OHMYAGENT_CONFIG_DIR=<workspace>/.ohmyagent
-//	  cwd  <workspace>/.ohmyagent
+//	opencode run --format json --auto --model nemesiscode-ai/<model> "<texte>"
 //
-// puis session/create {cwd: workspace, permission_mode, interactive, model}
-// et session/sendMessage {session_id, message: req.Text}.
+// (cwd = workspace, config LLM via les fichiers générés par le usecase).
 func (m *taskManager) Create(ctx context.Context, req taskflow.CreateTaskReq) error {
 	rec := m.c.getVM(req.VMID)
 	if rec == nil {
@@ -48,7 +44,7 @@ func (m *taskManager) Create(ctx context.Context, req taskflow.CreateTaskReq) er
 	if err := m.persistTaskConfig(rec); err != nil {
 		return err
 	}
-	return m.c.spawnAgent(ctx, rec, "")
+	return m.c.spawnAgent(ctx, rec, false)
 }
 
 // persistTaskConfig sérialise la config de tâche dans le workspace
@@ -71,9 +67,9 @@ func (m *taskManager) persistTaskConfig(rec *VM) error {
 	return nil
 }
 
-// spawnAgent démarre le vrai moteur pour la tâche du workspace rec.
-// resumeSession != "" → session/create {resume: resumeSession}.
-func (c *Client) spawnAgent(ctx context.Context, rec *VM, resumeSession string) error {
+// spawnAgent lance `opencode run` pour la tâche du workspace rec.
+// resume=true → `--continue` (reprend la dernière session du workspace).
+func (c *Client) spawnAgent(ctx context.Context, rec *VM, resume bool) error {
 	c.stopAgent(rec)
 
 	rec.mu.Lock()
@@ -88,173 +84,142 @@ func (c *Client) spawnAgent(ctx context.Context, rec *VM, resumeSession string) 
 		return fmt.Errorf("create engine dir: %w", err)
 	}
 
-	// Config LLM du moteur : settings.json (résolution par alias du modèle).
-	// La base_url + api_key sont celles du modèle configuré par l'utilisateur
-	// (pas de LLMProxy en mode local — le flux task.go les préserve).
-	if err := writeEngineSettings(engineDir, req.LLM, 200000, 32768); err != nil {
-		return fmt.Errorf("engine settings: %w", err)
+	// Configs générées par le usecase (auth.json + opencode.json globaux,
+	// règles…) — chemins ~ expandés vers le HOME de la machine locale.
+	if err := materializeConfigs(req.Configs); err != nil {
+		return fmt.Errorf("write agent configs: %w", err)
+	}
+	// Config projet <workspace>/opencode.json (prioritaire pour opencode) :
+	// api_key inline → aucun état global requis, fiable dès le premier run.
+	if err := writeProjectOpenCodeConfig(rec.workspace, req.LLM); err != nil {
+		return fmt.Errorf("write opencode config: %w", err)
 	}
 
 	bin := c.cfg.AgentBin
 	if bin == "" {
-		bin = "ohmyagent"
+		bin = "opencode"
 	}
-	args := append([]string{}, c.cfg.AgentArgs...)
-	if len(args) == 0 {
-		args = []string{"--stdio"}
+	args := []string{"run", "--format", "json", "--auto"}
+	if resume {
+		args = append(args, "--continue")
+	}
+	if req.LLM.Model != "" {
+		args = append(args, "--model", "nemesiscode-ai/"+req.LLM.Model)
+	}
+	if req.Text != "" {
+		args = append(args, req.Text)
 	}
 
 	// NB: exec.Command (pas CommandContext) — le ctx du hook lifecycle peut
 	// être annulé dès que handleProcessing rend la main. La fin de vie est
-	// gérée explicitement par stopAgent.
-	agent, err := startAgentProcess(bin, args, engineDir, []string{
-		"OHMYAGENT_CONFIG_DIR=" + engineDir,
+	// gérée explicitement par stopAgent / la fin naturelle du process.
+	agent, err := startOpenCodeRun(bin, args, rec.workspace, []string{
+		"OPENCODE_DISABLE_AUTOUPDATE=1",
+		"OPENCODE_DISABLE_ERROR_REPORTING=1",
+		"OPENCODE_DISABLE_USAGE=1",
+		"OPENCODE_DISABLE_BANNER=1",
 		"NEMESIS_TASK_ID=" + req.ID.String(),
 		"NEMESIS_VM_ID=" + rec.record.ID,
 		"NEMESIS_WORKSPACE=" + rec.workspace,
-	})
+	}, filepath.Join(engineDir, "opencode.log"))
 	if err != nil {
 		return err
 	}
 
 	rec.mu.Lock()
 	rec.agent = agent
+	rec.stopped = false
 	rec.mu.Unlock()
 
-	// session/create
-	params := map[string]any{
-		"cwd":             rec.workspace,
-		"permission_mode": c.cfg.PermissionMode,
-		"interactive":     true,
-	}
-	if c.cfg.PermissionMode == "" {
-		params["permission_mode"] = "yolo" // mode local : confiance
-	}
-	if resumeSession != "" {
-		params["resume"] = resumeSession
-	}
-	if req.LLM.Model != "" {
-		params["model"] = req.LLM.Model
-	}
-	resp, err := agent.call(ctx, "session/create", params)
-	if err != nil {
-		agent.close()
-		rec.mu.Lock()
-		rec.agent = nil
-		rec.mu.Unlock()
-		return fmt.Errorf("session/create: %w", err)
-	}
-	var created struct {
-		SessionID string `json:"session_id"`
-	}
-	_ = json.Unmarshal(resp, &created)
-	if created.SessionID == "" {
-		agent.close()
-		rec.mu.Lock()
-		rec.agent = nil
-		rec.mu.Unlock()
-		return fmt.Errorf("session/create: engine returned no session_id")
-	}
-	rec.mu.Lock()
-	rec.sessionID = created.SessionID
-	rec.mu.Unlock()
-
-	c.logger.InfoContext(ctx, "local agent session created",
+	c.logger.InfoContext(ctx, "local opencode run started",
 		"task_id", req.ID.String(), "vm_id", rec.record.ID,
-		"session_id", created.SessionID, "model", req.LLM.Model)
+		"model", req.LLM.Model, "resume", resume, "cmd", strings.Join(args, " "))
 
-	// Démarrer la pompe notifications (publication LiveStream) puis envoyer
-	// la demande initiale.
-	go c.pumpAgentNotifications(rec, agent)
-	if req.Text != "" {
-		if err := c.sendAgentMessage(rec, req.Text); err != nil {
-			return fmt.Errorf("session/sendMessage: %w", err)
+	// Streaming async : le process vit jusqu'à la fin du tour de l'agent.
+	go c.streamOpenCode(rec, agent)
+	return nil
+}
+
+// materializeConfigs écrit les ConfigFile générés par le usecase sur la
+// machine locale (chemins "~" expandés, modes respectés).
+func materializeConfigs(configs []taskflow.ConfigFile) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("resolve home dir: %w", err)
+	}
+	for _, cf := range configs {
+		if cf.Path == "" {
+			continue
+		}
+		p := cf.Path
+		if strings.HasPrefix(p, "~/") {
+			p = filepath.Join(home, p[2:])
+		}
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return fmt.Errorf("create config dir %s: %w", filepath.Dir(p), err)
+		}
+		mode := os.FileMode(0o644)
+		if cf.Mode != nil {
+			mode = os.FileMode(*cf.Mode)
+		}
+		if err := os.WriteFile(p, []byte(cf.Content), mode); err != nil {
+			return fmt.Errorf("write config %s: %w", p, err)
 		}
 	}
 	return nil
 }
 
-// pumpAgentNotifications lit les notifications du moteur et les publie dans
-// le LiveStream de la tâche (mapping ACP → TaskChunk).
-func (c *Client) pumpAgentNotifications(rec *VM, agent *agentClient) {
-	for {
-		select {
-		case <-agent.done:
-			return
-		case ev := <-agent.notif:
-			switch ev.Method {
-			case "event/stream":
-				for _, chunk := range engineEventToChunk(ev) {
-					rec.live.Publish(chunk)
-				}
-			case "permission/request":
-				// Mode local : auto-approve (confiance) — le moteur poursuit.
-				var p struct {
-					RequestID string `json:"request_id"`
-				}
-				_ = json.Unmarshal(ev.Params, &p)
-				if p.RequestID != "" {
-					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-					_, _ = agent.call(ctx, "permission/respond", map[string]any{
-						"request_id": p.RequestID,
-						"approved":   true,
-					})
-					cancel()
-				}
-			case "question/request":
-				// Question posée à l'utilisateur : v1 → répondre "annulé"
-				// (le frontend web question/answer n'est pas branché sur le
-				// moteur local pour l'instant).
-				var p struct {
-					RequestID string `json:"request_id"`
-				}
-				_ = json.Unmarshal(ev.Params, &p)
-				if p.RequestID != "" {
-					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-					_, _ = agent.call(ctx, "question/respond", map[string]any{
-						"request_id": p.RequestID,
-						"answers":    []any{},
-						"cancelled":  true,
-					})
-					cancel()
-				}
-			case "turn/stopped":
-				var p struct {
-					SessionID  string `json:"session_id"`
-					StopReason string `json:"stop_reason"`
-					Error      string `json:"error"`
-				}
-				_ = json.Unmarshal(ev.Params, &p)
-				kind := "success"
-				if p.Error != "" || p.StopReason == "error" {
-					kind = "failed"
-				}
-				rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: kind})
-				c.logger.Info("local agent turn stopped",
-					"session_id", p.SessionID, "stop_reason", p.StopReason)
-			default:
-				// permission/cancelled, question/cancelled, … : rien à publier
-			}
-		}
+// openCodeNpmPackage mappe l'interface_type du modèle vers le paquet npm
+// openai-sdk utilisé par opencode (même logique que le usecase backend).
+func openCodeNpmPackage(interfaceType string) string {
+	switch interfaceType {
+	case "openai_responses":
+		return "@ai-sdk/openai"
+	case "anthropic":
+		return "@ai-sdk/anthropic"
+	default:
+		return "@ai-sdk/openai-compatible"
 	}
 }
 
-// sendAgentMessage envoie un message utilisateur à la session active.
-func (c *Client) sendAgentMessage(rec *VM, text string) error {
-	rec.mu.Lock()
-	agent := rec.agent
-	sid := rec.sessionID
-	rec.mu.Unlock()
-	if agent == nil || sid == "" {
-		return fmt.Errorf("no active agent session")
+// writeProjectOpenCodeConfig écrit <workspace>/opencode.json — la config
+// « projet » qu'opencode charge automatiquement depuis son répertoire de
+// travail (prioritaire sur la config globale). L'api_key est inline dans les
+// options du provider : la connexion ne dépend d'aucun auth.json global.
+func writeProjectOpenCodeConfig(ws string, llm taskflow.LLM) error {
+	if llm.Model == "" {
+		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), engineRPCTimeout)
-	defer cancel()
-	_, err := agent.call(ctx, "session/sendMessage", map[string]any{
-		"session_id": sid,
-		"message":    text,
-	})
-	return err
+	cfg := map[string]any{
+		"provider": map[string]any{
+			"nemesiscode-ai": map[string]any{
+				"npm":   openCodeNpmPackage(string(llm.ApiType)),
+				"name":  "nemesiscode-ai",
+				"options": map[string]any{
+					"baseURL": llm.BaseURL,
+					"apiKey":  llm.ApiKey,
+				},
+				"models": map[string]any{
+					llm.Model: map[string]any{
+						"name":  llm.Model,
+						"limit": map[string]any{"context": 200000, "output": 32768},
+					},
+				},
+			},
+		},
+		"model":             "nemesiscode-ai/" + llm.Model,
+		"disabled_providers": []string{"openai", "opencode"},
+		"permission": map[string]any{
+			"doom_loop":          "allow",
+			"external_directory": map[string]any{"*": "allow"},
+			"read":               map[string]any{"*.env": "allow", "*.env.*": "allow"},
+		},
+	}
+	b, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(ws, "opencode.json"), b, 0o644)
 }
 
 // ---------------------------------------------------------------------------
@@ -272,7 +237,7 @@ func (m *taskManager) taskVM(req taskflow.TaskReq) (*VM, error) {
 	return rec, nil
 }
 
-// Stop arrête le moteur (destroy session + SIGINT).
+// Stop arrête le moteur (kill du process opencode).
 func (m *taskManager) Stop(ctx context.Context, req taskflow.TaskReq) error {
 	rec, err := m.taskVM(req)
 	if err != nil {
@@ -288,14 +253,18 @@ func (m *taskManager) Cancel(ctx context.Context, req taskflow.TaskReq) error {
 	if err != nil {
 		return err
 	}
+	rec.mu.Lock()
+	rec.stopped = true
+	rec.mu.Unlock()
 	if m.c.stopAgent(rec) {
 		rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: "cancelled"})
 	}
 	return nil
 }
 
-// Continue envoie un nouveau message à la session active ; si le moteur est
-// sorti, relance la session (resume).
+// Continue envoie un nouveau message : si l'agent travaille encore, on
+// refuse (opencode run est non-interactif — pas d'injection dans un process
+// vivant) ; sinon on relance avec --continue (reprise de la session).
 func (m *taskManager) Continue(ctx context.Context, req taskflow.TaskReq) error {
 	rec, err := m.taskVM(req)
 	if err != nil {
@@ -308,80 +277,51 @@ func (m *taskManager) Continue(ctx context.Context, req taskflow.TaskReq) error 
 		// (biz/task/handler/v1/task.go) avant d'arriver ici.
 		text = req.Task.Text
 	}
+	if text == "" {
+		return nil
+	}
+
 	rec.mu.Lock()
 	agent := rec.agent
-	sid := rec.sessionID
 	rec.mu.Unlock()
+	if agent != nil {
+		return fmt.Errorf("agent is still running, cannot continue yet")
+	}
 
-	if agent != nil && sid != "" {
-		if text == "" {
-			return nil
-		}
-		return m.c.sendAgentMessage(rec, text)
-	}
-	// Session morte → relancer avec resume.
-	if text != "" && rec.lastReq != nil {
-		rec.mu.Lock()
+	rec.mu.Lock()
+	if rec.lastReq != nil {
 		rec.lastReq.Text = text
-		rec.mu.Unlock()
-		_ = m.persistTaskConfig(rec)
 	}
-	return m.c.spawnAgent(ctx, rec, sid)
+	rec.mu.Unlock()
+	_ = m.persistTaskConfig(rec)
+	return m.c.spawnAgent(ctx, rec, true)
 }
 
-// Restart relance le moteur (resume de la session si possible).
+// Restart relance le moteur (reprise de la session avec --continue).
 func (m *taskManager) Restart(ctx context.Context, req taskflow.RestartTaskReq) (*taskflow.RestartTaskResp, error) {
 	rec := m.c.getVMByTask(req.ID.String())
 	if rec == nil {
 		return nil, fmt.Errorf("environment not found: %s", req.ID)
 	}
-	rec.mu.Lock()
-	sid := rec.sessionID
-	rec.mu.Unlock()
-	if err := m.c.spawnAgent(ctx, rec, sid); err != nil {
+	if err := m.c.spawnAgent(ctx, rec, true); err != nil {
 		return &taskflow.RestartTaskResp{
 			ID: req.ID, RequestId: req.RequestId, Success: false, Message: err.Error(),
 		}, nil
 	}
 	return &taskflow.RestartTaskResp{
-		ID: req.ID, RequestId: req.RequestId, Success: true, SessionID: sid,
+		ID: req.ID, RequestId: req.RequestId, Success: true,
 	}, nil
 }
 
-// AutoApprove : le mode local auto-approuve (permission_mode=yolo) — no-op.
+// AutoApprove : opencode est lancé avec --auto (mode local yolo) — no-op.
 func (m *taskManager) AutoApprove(ctx context.Context, req taskflow.TaskApproveReq) error {
 	return nil
 }
 
-// AskUserQuestion : réponse utilisateur aux questions du moteur.
-// v1 : si la session est active, on relaie via question/respond.
+// AskUserQuestion : opencode non-interactif (--auto) ne pose pas de
+// questions — no-op.
 func (m *taskManager) AskUserQuestion(ctx context.Context, req taskflow.AskUserQuestionResponse) error {
-	rec := m.c.getVMByTask(req.TaskId)
-	if rec == nil {
-		return fmt.Errorf("environment not found: %s", req.TaskId)
-	}
-	rec.mu.Lock()
-	agent := rec.agent
-	rec.mu.Unlock()
-	if agent == nil {
-		return nil
-	}
-	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	_, err := agent.call(ctx2, "question/respond", map[string]any{
-		"request_id": req.RequestId,
-		"answers":    parseAnswersJSON(req.AnswersJson),
-		"cancelled":  req.Cancelled,
-	})
-	return err
-}
-
-func parseAnswersJSON(s string) []any {
-	var out []any
-	if s != "" {
-		_ = json.Unmarshal([]byte(s), &out)
-	}
-	return out
+	return nil
 }
 
 // ---------------------------------------------------------------------------
