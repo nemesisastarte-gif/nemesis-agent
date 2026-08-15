@@ -16,7 +16,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${1:-1.2.1}"
+VERSION="${1:-1.2.2}"
 OUT_DIR="$ROOT/dist-deb"
 STAGE="$OUT_DIR/stage"
 DEB="$OUT_DIR/nemesiscode_${VERSION}_amd64.deb"
@@ -39,23 +39,28 @@ echo "==> [2/4] Backend (binaire statique, GOAMD64=v1)…"
   -trimpath -buildvcs=false \
   -ldflags "-s -w -X main.version=${VERSION}" -o "$OUT_DIR/nemesiscode-server" ./cmd/server)
 
-echo "==> [2b/4] Moteur opencode (binaire baseline x64 — vieux CPU, SSE2)…"
-# opencode (https://github.com/anomalyco/opencode) est distribué sur npm :
-# le paquet opencode-linux-x64-baseline contient le binaire compilé pour
-# x86-64 sans exigence AVX (baseline). Même version que le CLI opencode-ai.
-OC_DIR="$OUT_DIR/opencode"
-mkdir -p "$OC_DIR"
-echo '{"name":"opencode-embed","version":"1.0.0","private":true}' > "$OC_DIR/package.json"
-OC_VER="$(npm view opencode-ai version 2>/dev/null || echo latest)"
-(cd "$OC_DIR" && npm install --no-audit --no-fund \
-  "opencode-ai@$OC_VER" "opencode-linux-x64-baseline@$OC_VER" >/dev/null 2>&1)
-if [ ! -x "$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" ]; then
-  echo "❌ opencode-linux-x64-baseline est introuvable." >&2
-  echo "   Refus du fallback x64 standard : il utilise AVX et plante sur Core 2 Duo." >&2
+echo "==> [2b/4] Moteur opencode portable (Go, x86-64-v1)…"
+# Le binaire officiel actuel repose sur Bun. Même sa variante "baseline"
+# exige SSE4.2 (Nehalem+) et plante par SIGILL sur Core 2 Duo. Nous compilons
+# donc la dernière version Go d'OpenCode, épinglée et adaptée au protocole
+# NemesisCode. GOAMD64=v1 garantit seulement le socle x86-64/SSE2.
+OC_DIR="$OUT_DIR/opencode-portable-src"
+OC_TAG="v0.0.52"
+OC_COMMIT="2b258b14732c9a0f50cc3552a27ebf0f68be4e53"
+rm -rf "$OC_DIR"
+git clone --quiet --depth 1 --branch "$OC_TAG" https://github.com/sst/opencode.git "$OC_DIR"
+if [ "$(git -C "$OC_DIR" rev-parse HEAD)" != "$OC_COMMIT" ]; then
+  echo "❌ La source OpenCode $OC_TAG ne correspond pas au commit attendu." >&2
   exit 1
 fi
-"$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" --version 2>/dev/null \
-  || { echo "❌ le binaire opencode baseline ne démarre pas sur cette machine." >&2; exit 1; }
+git -C "$OC_DIR" apply "$ROOT/packaging/opencode-portable-v0.0.52.patch"
+(cd "$OC_DIR" && gofmt -w cmd internal && go test ./internal/config ./internal/format ./internal/llm/models)
+(cd "$OC_DIR" && GOGC=40 go build -p "${GO_BUILD_P:-2}" \
+  -trimpath -buildvcs=false \
+  -ldflags '-s -w -X github.com/sst/opencode/internal/version.Version=0.0.52-nemesis-portable' \
+  -o "$OUT_DIR/opencode-portable" ./main.go)
+"$OUT_DIR/opencode-portable" --version | grep -Fx '0.0.52-nemesis-portable' >/dev/null
+"$OUT_DIR/opencode-portable" --nemesis-protocol-version | grep -Fx '1' >/dev/null
 
 echo "==> [3/4] Assemblage du paquet…"
 rm -rf "$STAGE"
@@ -67,8 +72,12 @@ mkdir -p "$STAGE/usr/share/doc/nemesiscode"
 sed "s/^Version: .*/Version: $VERSION/" "$ROOT/packaging/deb/DEBIAN/control" > "$STAGE/DEBIAN/control"
 install -m 0755 "$ROOT/packaging/deb/usr/bin/nemesiscode" "$STAGE/usr/bin/nemesiscode"
 install -m 0755 "$OUT_DIR/nemesiscode-server" "$STAGE/usr/share/nemesiscode/nemesiscode-server"
-install -m 0755 "$OC_DIR/node_modules/opencode-linux-x64-baseline/bin/opencode" \
+install -m 0755 "$ROOT/packaging/deb/usr/share/nemesiscode/opencode" \
   "$STAGE/usr/share/nemesiscode/opencode"
+install -m 0755 "$OUT_DIR/opencode-portable" \
+  "$STAGE/usr/share/nemesiscode/opencode-portable"
+install -m 0644 "$OC_DIR/LICENSE" \
+  "$STAGE/usr/share/doc/nemesiscode/LICENSE.opencode"
 cp -a "$ROOT/frontend/dist/." "$STAGE/usr/share/nemesiscode/web/"
 install -m 0644 "$ROOT/docs/deb-package.md" "$STAGE/usr/share/doc/nemesiscode/README.md"
 gzip -9n -c "$ROOT/docs/deb-package.md" > "$STAGE/usr/share/doc/nemesiscode/README.md.gz" 2>/dev/null || true
@@ -76,10 +85,10 @@ rm -f "$STAGE/usr/share/doc/nemesiscode/README.md"
 
 echo "==> [4/4] dpkg-deb…"
 dpkg-deb --root-owner-group --build "$STAGE" "$DEB"
-rm -rf "$STAGE" "$OUT_DIR/nemesiscode-server" "$OC_DIR"
+rm -rf "$STAGE" "$OUT_DIR/nemesiscode-server" "$OUT_DIR/opencode-portable" "$OC_DIR"
 
 echo
 echo "✅ Paquet créé : $DEB"
 echo "   Installation : sudo dpkg -i $DEB"
 echo "   Puis : nemesiscode on  →  http://localhost:5000  (Admin / Admin)"
-echo "   Moteur agent opencode EMBARQUÉ (aucune installation requise)."
+echo "   Moteur agent opencode portable EMBARQUÉ (x86-64-v1, aucune installation requise)."

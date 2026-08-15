@@ -1,0 +1,347 @@
+diff --git a/cmd/non_interactive_mode.go b/cmd/non_interactive_mode.go
+index 5023839..cb323f2 100644
+--- a/cmd/non_interactive_mode.go
++++ b/cmd/non_interactive_mode.go
+@@ -19,6 +19,7 @@ import (
+ 	"github.com/sst/opencode/internal/llm/tools"
+ 	"github.com/sst/opencode/internal/message"
+ 	"github.com/sst/opencode/internal/permission"
++	"github.com/sst/opencode/internal/session"
+ 	"github.com/sst/opencode/internal/tui/components/spinner"
+ 	"github.com/sst/opencode/internal/tui/theme"
+ )
+@@ -152,13 +153,26 @@ func handleNonInteractiveMode(ctx context.Context, prompt string, outputFormat f
+ 		return err
+ 	}
+ 
+-	// Create a new session for this prompt
+-	session, err := app.Sessions.Create(ctx, "Non-interactive prompt")
+-	if err != nil {
+-		return fmt.Errorf("failed to create session: %w", err)
++	// Reuse the latest session for follow-up turns when requested by NemesisCode.
++	var currentSession session.Session
++	if os.Getenv("NEMESIS_CONTINUE") == "1" {
++		sessions, listErr := app.Sessions.List(ctx)
++		if listErr != nil {
++			return fmt.Errorf("failed to list sessions: %w", listErr)
++		}
++		if len(sessions) > 0 {
++			currentSession = sessions[0]
++		}
++	}
++	if currentSession.ID == "" {
++		currentSession, err = app.Sessions.Create(ctx, "NemesisCode task")
++		if err != nil {
++			return fmt.Errorf("failed to create session: %w", err)
++		}
+ 	}
+ 
+ 	// Set the session as current
++	session := currentSession
+ 	app.CurrentSession = &session
+ 
+ 	// Auto-approve all permissions for this session
+diff --git a/cmd/root.go b/cmd/root.go
+index 39d58ea..faed1c4 100644
+--- a/cmd/root.go
++++ b/cmd/root.go
+@@ -2,6 +2,7 @@ package cmd
+ 
+ import (
+ 	"context"
++	"encoding/json"
+ 	"fmt"
+ 	"os"
+ 	"sync"
+@@ -60,6 +61,10 @@ to assist developers in writing, debugging, and understanding code directly from
+ 			fmt.Println(version.Version)
+ 			return nil
+ 		}
++		if cmd.Flag("nemesis-protocol-version").Changed {
++			fmt.Println("1")
++			return nil
++		}
+ 
+ 		// Setup logging
+ 		lvl := new(slog.LevelVar)
+@@ -307,6 +312,13 @@ func setupSubscriptions(app *app.App, parentCtx context.Context) (chan tea.Msg,
+ func Execute() {
+ 	err := rootCmd.Execute()
+ 	if err != nil {
++		if os.Getenv("NEMESIS_PROTOCOL") == "1" {
++			payload, _ := json.Marshal(map[string]any{
++				"type": "error",
++				"error": map[string]string{"message": err.Error()},
++			})
++			fmt.Println(string(payload))
++		}
+ 		os.Exit(1)
+ 	}
+ }
+@@ -314,6 +326,7 @@ func Execute() {
+ func init() {
+ 	rootCmd.Flags().BoolP("help", "h", false, "Help")
+ 	rootCmd.Flags().BoolP("version", "v", false, "Version")
++	rootCmd.Flags().Bool("nemesis-protocol-version", false, "NemesisCode protocol version")
+ 	rootCmd.Flags().BoolP("debug", "d", false, "Debug")
+ 	rootCmd.Flags().StringP("cwd", "c", "", "Current working directory")
+ 	rootCmd.Flags().StringP("prompt", "p", "", "Run a single prompt in non-interactive mode")
+diff --git a/go.mod b/go.mod
+index 4266e71..d104d5a 100644
+--- a/go.mod
++++ b/go.mod
+@@ -132,3 +132,28 @@ require (
+ 	google.golang.org/protobuf v1.36.6 // indirect
+ 	gopkg.in/yaml.v3 v3.0.1 // indirect
+ )
++
++replace (
++	cloud.google.com/go => github.com/googleapis/google-cloud-go v0.116.0
++	cloud.google.com/go/auth => github.com/googleapis/google-cloud-go/auth v0.13.0
++	cloud.google.com/go/compute/metadata => github.com/googleapis/google-cloud-go/compute/metadata v0.6.0
++	go.opentelemetry.io/auto/sdk => github.com/open-telemetry/opentelemetry-go-instrumentation/sdk v1.1.0
++	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => github.com/open-telemetry/opentelemetry-go-contrib/instrumentation/net/http/otelhttp v0.54.0
++	go.opentelemetry.io/otel => github.com/open-telemetry/opentelemetry-go v1.35.0
++	go.opentelemetry.io/otel/metric => github.com/open-telemetry/opentelemetry-go/metric v1.35.0
++	go.opentelemetry.io/otel/trace => github.com/open-telemetry/opentelemetry-go/trace v1.35.0
++	go.uber.org/multierr => github.com/uber-go/multierr v1.11.0
++	golang.org/x/crypto => github.com/golang/crypto v0.37.0
++	golang.org/x/exp => github.com/golang/exp v0.0.0-20250305212735-054e65f0b394
++	golang.org/x/image => github.com/golang/image v0.26.0
++	golang.org/x/net => github.com/golang/net v0.39.0
++	golang.org/x/sync => github.com/golang/sync v0.13.0
++	golang.org/x/sys => github.com/golang/sys v0.32.0
++	golang.org/x/term => github.com/golang/term v0.31.0
++	golang.org/x/text => github.com/golang/text v0.24.0
++	google.golang.org/genai => github.com/googleapis/go-genai v1.3.0
++	google.golang.org/genproto/googleapis/rpc => github.com/googleapis/go-genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463
++	google.golang.org/grpc => github.com/grpc/grpc-go v1.71.0
++	google.golang.org/protobuf => github.com/protocolbuffers/protobuf-go v1.36.6
++	gopkg.in/yaml.v3 => github.com/go-yaml/yaml v0.0.0-20220527083530-f6f7691b1fde
++)
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 432ba6e..573f5d6 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -234,6 +234,20 @@ func setProviderDefaults() {
+ 		viper.SetDefault("providers.azure.apiKey", os.Getenv("AZURE_OPENAI_API_KEY"))
+ 	}
+ 
++	if os.Getenv("NEMESIS_MODEL") != "" {
++		provider := models.ProviderOpenAI
++		apiKey := os.Getenv("OPENAI_API_KEY")
++		if os.Getenv("NEMESIS_INTERFACE_TYPE") == "anthropic" {
++			provider = models.ProviderAnthropic
++			apiKey = os.Getenv("ANTHROPIC_API_KEY")
++		}
++		viper.Set("providers."+string(provider)+".apiKey", apiKey)
++		viper.Set("agents.primary.model", models.NemesisModelID)
++		viper.Set("agents.task.model", models.NemesisModelID)
++		viper.Set("agents.title.model", models.NemesisModelID)
++		return
++	}
++
+ 	// Use this order to set the default models
+ 	// 1. Anthropic
+ 	// 2. OpenAI
+diff --git a/internal/format/format.go b/internal/format/format.go
+index 321f5c1..745d062 100644
+--- a/internal/format/format.go
++++ b/internal/format/format.go
+@@ -3,6 +3,7 @@ package format
+ import (
+ 	"encoding/json"
+ 	"fmt"
++	"os"
+ )
+ 
+ // OutputFormat represents the format for non-interactive mode output
+@@ -32,10 +33,18 @@ func FormatOutput(content string, format OutputFormat) (string, error) {
+ 	case TextFormat:
+ 		return content, nil
+ 	case JSONFormat:
+-		jsonData := map[string]string{
+-			"response": content,
++		var jsonBytes []byte
++		var err error
++		if os.Getenv("NEMESIS_PROTOCOL") == "1" {
++			jsonBytes, err = json.Marshal(map[string]any{
++				"type": "text",
++				"part": map[string]string{"type": "text", "text": content},
++			})
++		} else {
++			jsonBytes, err = json.MarshalIndent(map[string]string{
++				"response": content,
++			}, "", "  ")
+ 		}
+-		jsonBytes, err := json.MarshalIndent(jsonData, "", "  ")
+ 		if err != nil {
+ 			return "", fmt.Errorf("failed to marshal JSON: %w", err)
+ 		}
+diff --git a/internal/format/format_test.go b/internal/format/format_test.go
+index 04054a7..fc5e7b4 100644
+--- a/internal/format/format_test.go
++++ b/internal/format/format_test.go
+@@ -88,3 +88,15 @@ func TestFormatOutput(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestFormatOutputNemesisProtocol(t *testing.T) {
++	t.Setenv("NEMESIS_PROTOCOL", "1")
++	got, err := FormatOutput("portable ok", JSONFormat)
++	if err != nil {
++		t.Fatal(err)
++	}
++	want := `{"part":{"text":"portable ok","type":"text"},"type":"text"}`
++	if got != want {
++		t.Fatalf("FormatOutput() = %s, want %s", got, want)
++	}
++}
+diff --git a/internal/llm/agent/agent.go b/internal/llm/agent/agent.go
+index 184ef96..ae73f1d 100644
+--- a/internal/llm/agent/agent.go
++++ b/internal/llm/agent/agent.go
+@@ -5,6 +5,7 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"log/slog"
++	"os"
+ 	"strings"
+ 	"sync"
+ 	"time"
+@@ -777,6 +778,18 @@ func createAgentProvider(agentName config.AgentName) (provider.Provider, error)
+ 		provider.WithSystemMessage(prompt.GetAgentPrompt(agentName, model.Provider)),
+ 		provider.WithMaxTokens(maxTokens),
+ 	}
++	if model.ID == models.NemesisModelID {
++		switch model.Provider {
++		case models.ProviderOpenAI:
++			opts = append(opts, provider.WithOpenAIOptions(
++				provider.WithOpenAIBaseURL(os.Getenv("NEMESIS_BASE_URL")),
++			))
++		case models.ProviderAnthropic:
++			opts = append(opts, provider.WithAnthropicOptions(
++				provider.WithAnthropicBaseURL(os.Getenv("NEMESIS_BASE_URL")),
++			))
++		}
++	}
+ 	if model.Provider == models.ProviderOpenAI && model.CanReason {
+ 		opts = append(
+ 			opts,
+diff --git a/internal/llm/models/models.go b/internal/llm/models/models.go
+index bfdd0d2..0734e8a 100644
+--- a/internal/llm/models/models.go
++++ b/internal/llm/models/models.go
+@@ -1,6 +1,10 @@
+ package models
+ 
+-import "maps"
++import (
++	"maps"
++	"os"
++	"strconv"
++)
+ 
+ type (
+ 	ModelID       string
+@@ -25,6 +29,8 @@ type Model struct {
+ const (
+ 	// ForTests
+ 	ProviderMock ModelProvider = "__mock"
++
++	NemesisModelID ModelID = "nemesis-custom"
+ )
+ 
+ // Providers in order of popularity
+@@ -51,4 +57,29 @@ func init() {
+ 	maps.Copy(SupportedModels, OpenRouterModels)
+ 	maps.Copy(SupportedModels, XAIModels)
+ 	maps.Copy(SupportedModels, VertexAIGeminiModels)
++
++	apiModel := os.Getenv("NEMESIS_MODEL")
++	if apiModel == "" {
++		return
++	}
++	contextLimit, _ := strconv.ParseInt(os.Getenv("NEMESIS_CONTEXT_LIMIT"), 10, 64)
++	if contextLimit <= 0 {
++		contextLimit = 128000
++	}
++	outputLimit, _ := strconv.ParseInt(os.Getenv("NEMESIS_OUTPUT_LIMIT"), 10, 64)
++	if outputLimit <= 0 {
++		outputLimit = 8192
++	}
++	provider := ProviderOpenAI
++	if os.Getenv("NEMESIS_INTERFACE_TYPE") == "anthropic" {
++		provider = ProviderAnthropic
++	}
++	SupportedModels[NemesisModelID] = Model{
++		ID: NemesisModelID,
++		Name: apiModel,
++		Provider: provider,
++		APIModel: apiModel,
++		ContextWindow: contextLimit,
++		DefaultMaxTokens: outputLimit,
++	}
+ }
+diff --git a/internal/llm/provider/anthropic.go b/internal/llm/provider/anthropic.go
+index 24bcb48..6907095 100644
+--- a/internal/llm/provider/anthropic.go
++++ b/internal/llm/provider/anthropic.go
+@@ -24,6 +24,7 @@ type anthropicOptions struct {
+ 	useBedrock   bool
+ 	disableCache bool
+ 	shouldThink  func(userMessage string) bool
++	baseURL      string
+ }
+ 
+ type AnthropicOption func(*anthropicOptions)
+@@ -46,6 +47,9 @@ func newAnthropicClient(opts providerClientOptions) AnthropicClient {
+ 	if opts.apiKey != "" {
+ 		anthropicClientOptions = append(anthropicClientOptions, option.WithAPIKey(opts.apiKey))
+ 	}
++	if anthropicOpts.baseURL != "" {
++		anthropicClientOptions = append(anthropicClientOptions, option.WithBaseURL(anthropicOpts.baseURL))
++	}
+ 	if anthropicOpts.useBedrock {
+ 		anthropicClientOptions = append(anthropicClientOptions, bedrock.WithLoadDefaultConfig(context.Background()))
+ 	}
+@@ -470,3 +474,9 @@ func WithAnthropicShouldThinkFn(fn func(string) bool) AnthropicOption {
+ 		options.shouldThink = fn
+ 	}
+ }
++
++func WithAnthropicBaseURL(baseURL string) AnthropicOption {
++	return func(options *anthropicOptions) {
++		options.baseURL = baseURL
++	}
++}
+diff --git a/internal/llm/provider/openai.go b/internal/llm/provider/openai.go
+index db77a38..9dc0813 100644
+--- a/internal/llm/provider/openai.go
++++ b/internal/llm/provider/openai.go
+@@ -5,6 +5,7 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"log/slog"
++	"os"
+ 	"github.com/openai/openai-go"
+ 	"github.com/openai/openai-go/option"
+ 	"github.com/sst/opencode/internal/llm/models"
+@@ -60,14 +61,14 @@ func newOpenAIClient(opts providerClientOptions) OpenAIClient {
+ }
+ 
+ func (o *openaiClient) send(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (response *ProviderResponse, err error) {
+-	if o.providerOptions.model.ID == models.OpenAIModels[models.CodexMini].ID || o.providerOptions.model.ID == models.OpenAIModels[models.O1Pro].ID {
++	if os.Getenv("NEMESIS_INTERFACE_TYPE") == "openai_responses" || o.providerOptions.model.ID == models.OpenAIModels[models.CodexMini].ID || o.providerOptions.model.ID == models.OpenAIModels[models.O1Pro].ID {
+ 		return o.sendResponseMessages(ctx, messages, tools)
+ 	}
+ 	return o.sendChatcompletionMessage(ctx, messages, tools)
+ }
+ 
+ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, tools []tools.BaseTool) <-chan ProviderEvent {
+-	if o.providerOptions.model.ID == models.OpenAIModels[models.CodexMini].ID || o.providerOptions.model.ID == models.OpenAIModels[models.O1Pro].ID {
++	if os.Getenv("NEMESIS_INTERFACE_TYPE") == "openai_responses" || o.providerOptions.model.ID == models.OpenAIModels[models.CodexMini].ID || o.providerOptions.model.ID == models.OpenAIModels[models.O1Pro].ID {
+ 		return o.streamResponseMessages(ctx, messages, tools)
+ 	}
+ 	return o.streamChatCompletionMessages(ctx, messages, tools)

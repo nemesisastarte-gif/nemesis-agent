@@ -12,9 +12,9 @@ Description: NemesisCode — plateforme d'agents de code 100% locale (paquet tou
  fonctionne entièrement en local : base SQLite, Redis intégré en mémoire,
  stockage fichier, frontend servi par le backend sur un seul port.
  .
- Le paquet contient un backend statique, le frontend compilé et le moteur
- opencode baseline (aucune instruction AVX requise — compatible Core 2 Duo et
- vieux PC).
+ Le paquet contient un backend statique, le frontend compilé et un moteur
+ opencode portable compilé en Go pour x86-64-v1 : aucune instruction AVX ni
+ SSE4.2 requise, y compris sur Core 2 Duo et anciennes machines virtuelles.
  .
  Utilisation :
    nemesiscode on     → http://localhost:5000 (connexion Admin / Admin)

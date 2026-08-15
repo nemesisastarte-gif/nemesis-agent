@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/teteekoue/NemesisCode/backend/pkg/taskflow"
@@ -142,6 +143,19 @@ func (c *Client) spawnAgent(ctx context.Context, rec *VM, resume bool) error {
 		"NEMESIS_TASK_ID=" + req.ID.String(),
 		"NEMESIS_VM_ID=" + rec.record.ID,
 		"NEMESIS_WORKSPACE=" + rec.workspace,
+		"NEMESIS_PROTOCOL=1",
+		"NEMESIS_MODEL=" + req.LLM.Model,
+		"NEMESIS_BASE_URL=" + req.LLM.BaseURL,
+		"NEMESIS_INTERFACE_TYPE=" + req.LLM.ApiType,
+		"NEMESIS_CONTEXT_LIMIT=" + strconv.Itoa(req.LLM.ContextLimit),
+		"NEMESIS_OUTPUT_LIMIT=" + strconv.Itoa(req.LLM.OutputLimit),
+		"OPENAI_API_KEY=" + req.LLM.ApiKey,
+		"ANTHROPIC_API_KEY=" + req.LLM.ApiKey,
+	}
+	if resume {
+		agentEnv = append(agentEnv, "NEMESIS_CONTINUE=1")
+	} else {
+		agentEnv = append(agentEnv, "NEMESIS_CONTINUE=0")
 	}
 	for key, value := range req.Env {
 		if key != "" && !strings.Contains(key, "=") {

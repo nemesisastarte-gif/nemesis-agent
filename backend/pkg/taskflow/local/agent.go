@@ -44,8 +44,6 @@ import (
 type agentClient struct {
 	cmd     *exec.Cmd
 	stdout  io.ReadCloser
-	done    chan struct{}
-	waitErr chan error
 	logPath string
 	ignored atomic.Bool // remplacement/arrêt volontaire : ne pas publier de fin
 }
@@ -94,18 +92,11 @@ func startOpenCodeRun(bin string, args []string, cwd string, env []string, logPa
 		_ = logFile.Close()
 	}
 
-	ac := &agentClient{
+	return &agentClient{
 		cmd:     cmd,
 		stdout:  stdout,
-		done:    make(chan struct{}),
-		waitErr: make(chan error, 1),
 		logPath: logPath,
-	}
-	go func() {
-		ac.waitErr <- cmd.Wait()
-		close(ac.done)
-	}()
-	return ac, nil
+	}, nil
 }
 
 // close tue le processus (SIGTERM au groupe, puis SIGKILL après grace).
@@ -344,28 +335,47 @@ func tailLog(path string, maxLines int) string {
 	return strings.Join(lines, "\n")
 }
 
+func openCodeExitMessage(err error) string {
+	if ee, ok := err.(*exec.ExitError); ok {
+		if status, ok := ee.Sys().(syscall.WaitStatus); ok && status.Signaled() {
+			signal := status.Signal()
+			if signal == syscall.SIGILL {
+				return "opencode a reçu SIGILL (instruction processeur illégale) : moteur incompatible avec ce CPU"
+			}
+			return fmt.Sprintf("opencode a été arrêté par le signal %s", signal)
+		}
+		return fmt.Sprintf("opencode s'est arrêté avec le code %d", ee.ExitCode())
+	}
+	return fmt.Sprintf("opencode a échoué: %v", err)
+}
+
+func consumeOpenCodeOutput(agent *agentClient, onLine func(string)) (scanErr, waitErr error) {
+	scanner := bufio.NewScanner(agent.stdout)
+	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		if line := strings.TrimSpace(scanner.Text()); line != "" {
+			onLine(line)
+		}
+	}
+	// Wait ferme les pipes créés par StdoutPipe. Il doit impérativement être
+	// appelé après la fin de lecture ; l'ancien Wait concurrent provoquait la
+	// fausse erreur « read |0: file already closed » à la sortie du moteur.
+	return scanner.Err(), agent.cmd.Wait()
+}
+
 // streamOpenCode lit la sortie NDJSON du process et publie les chunks dans le
 // LiveStream de la tâche ; à la fin du process, publie task-ended (success si
 // exit 0, sinon task-error + failed) — sauf arrêt volontaire (Cancel/Stop).
 func (c *Client) streamOpenCode(rec *VM, agent *agentClient) {
-	scanner := bufio.NewScanner(agent.stdout)
-	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
 	sawEngineError := false
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
+	scanErr, waitErr := consumeOpenCodeOutput(agent, func(line string) {
 		for _, chunk := range openCodeLineToChunks([]byte(line)) {
 			if chunk.Event == "task-error" {
 				sawEngineError = true
 			}
 			rec.live.Publish(chunk)
 		}
-	}
-	scanErr := scanner.Err()
-
-	waitErr := <-agent.waitErr
+	})
 
 	rec.mu.Lock()
 	stopped := rec.stopped
@@ -390,12 +400,7 @@ func (c *Client) streamOpenCode(rec *VM, agent *agentClient) {
 	}
 
 	if waitErr != nil && !sawEngineError {
-		msg := "opencode failed"
-		if ee, ok := waitErr.(*exec.ExitError); ok {
-			msg = fmt.Sprintf("opencode s'est arrêté avec le code %d", ee.ExitCode())
-		} else {
-			msg = fmt.Sprintf("opencode a échoué: %v", waitErr)
-		}
+		msg := openCodeExitMessage(waitErr)
 		if logTail := tailLog(agent.logPath, 30); logTail != "" {
 			msg += "\n\nJournal opencode:\n" + logTail
 		}
@@ -403,15 +408,11 @@ func (c *Client) streamOpenCode(rec *VM, agent *agentClient) {
 		sawEngineError = true
 	}
 
-	success := waitErr == nil && scanErr == nil && !sawEngineError
 	kind := "success"
-	if !success {
+	if sawEngineError {
 		kind = "failed"
 	}
 	rec.live.Publish(&taskflow.TaskChunk{Event: "task-ended", Kind: kind})
 	c.logger.Info("local opencode run finished", "vm_id", rec.record.ID,
 		"err", waitErr, "stream_error", scanErr, "engine_error", sawEngineError)
-
-	// task-ended termine un tour, pas la conversation. La tâche reste en
-	// processing afin que le navigateur puisse envoyer les tours suivants.
 }

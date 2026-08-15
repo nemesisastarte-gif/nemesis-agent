@@ -117,9 +117,8 @@ cmd_on() {
     export MCAI_TASKFLOW_LOCAL_AGENT_BIN="$engine"
     echo "    Moteur agent : $engine"
   else
-    echo "ℹ️  Moteur opencode non trouvé — l'interface (modèles, tâches) marchera,"
-    echo "   mais l'exécution des tâches nécessite le binaire du moteur."
-    echo "   Placez-le dans ~/.nemesiscode/opencode (voir docs/deb-package.md)."
+    echo "ℹ️  Moteur opencode indisponible — l'interface démarrera, mais pas les tâches."
+    engine_failure_hint
   fi
 
   echo "==> Démarrage de NemesisCode (port $PORT)…"
@@ -189,8 +188,23 @@ cmd_status() {
     engine_version="$("$engine" --version 2>/dev/null | head -1 || true)"
     echo "   ⚙️  Moteur agent (opencode ${engine_version:-version inconnue}) : $engine"
   else
-    echo "   ⚠️  Moteur agent : NON trouvé (tâches non exécutables)."
-    echo "       Placez opencode dans ~/.nemesiscode/opencode — voir docs/deb-package.md"
+    echo "   ⚠️  Moteur agent : indisponible (tâches non exécutables)."
+    engine_failure_hint
+  fi
+}
+
+engine_failure_hint() {
+  local packaged=/usr/share/nemesiscode/opencode
+  if [ -e "$packaged" ]; then
+    echo "   ⚠️  Le moteur du paquet existe mais ne peut pas s'exécuter : $packaged" >&2
+    ls -l "$packaged" >&2 || true
+    set +e
+    "$packaged" --version >&2
+    local rc=$?
+    set -e
+    echo "   Code de sortie du moteur : $rc" >&2
+  else
+    echo "   ❌ Le paquet ne contient pas $packaged." >&2
   fi
 }
 
@@ -198,7 +212,27 @@ cmd_engine() {
   if engine="$(resolve_engine)"; then
     echo "$engine"
   else
-    echo "non trouvé — placez le binaire dans ~/.nemesiscode/opencode" >&2
+    engine_failure_hint
+    return 1
+  fi
+}
+
+cmd_doctor() {
+  echo "NemesisCode diagnostic"
+  echo "  paquet : $(dpkg-query -W -f='${Version}' nemesiscode 2>/dev/null || echo inconnu)"
+  echo "  noyau  : $(uname -srmo 2>/dev/null || uname -a)"
+  if [ -r /proc/cpuinfo ]; then
+    local flags
+    flags="$(grep -m1 '^flags' /proc/cpuinfo 2>/dev/null || true)"
+    case " $flags " in *' sse4_2 '*) echo "  CPU     : SSE4.2 présent" ;; *) echo "  CPU     : SSE4.2 absent" ;; esac
+    case " $flags " in *' avx '*) echo "            AVX présent" ;; *) echo "            AVX absent" ;; esac
+  fi
+  if engine="$(resolve_engine)"; then
+    echo "  moteur  : $engine"
+    echo "  version : $("$engine" --version 2>&1 | head -1)"
+  else
+    echo "  moteur  : inutilisable"
+    engine_failure_hint
     return 1
   fi
 }
@@ -213,14 +247,16 @@ case "${1:-}" in
   restart)   cmd_off; cmd_on ;;
   status)    cmd_status ;;
   engine)    cmd_engine ;;
+  doctor)    cmd_doctor ;;
   logs)      cmd_logs ;;
   *)
-    echo "Usage : nemesiscode {on|off|restart|status|engine|logs}"
+    echo "Usage : nemesiscode {on|off|restart|status|engine|doctor|logs}"
     echo
     echo "  on       démarre NemesisCode (frontend + backend) sur http://localhost:$PORT"
     echo "  off      arrête tout"
     echo "  status   état actuel"
     echo "  engine   chemin du moteur opencode sélectionné"
+    echo "  doctor   diagnostic paquet, CPU et moteur"
     echo "  logs     suit les logs du serveur"
     echo
     echo "Variables utiles : NEMESISCODE_PORT (défaut $PORT), MCAI_INIT_TEAM_PASSWORD,"

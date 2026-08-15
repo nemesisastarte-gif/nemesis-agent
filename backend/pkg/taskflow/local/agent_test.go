@@ -2,6 +2,8 @@ package local
 
 import (
 	"encoding/json"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -126,6 +128,44 @@ func TestOpenCodeLineIgnored(t *testing.T) {
 	} {
 		if chunks := openCodeLineToChunks([]byte(line)); len(chunks) != 0 {
 			t.Fatalf("line %q should produce no chunk, got %d", line, len(chunks))
+		}
+	}
+}
+
+func TestOpenCodeExitMessageNamesSIGILL(t *testing.T) {
+	dir := t.TempDir()
+	agent, err := startOpenCodeRun("/bin/sh", []string{"-c", "kill -ILL $$"}, dir, nil, filepath.Join(dir, "engine.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, waitErr := consumeOpenCodeOutput(agent, func(string) {})
+	if waitErr == nil {
+		t.Fatal("expected process error")
+	}
+	if got := openCodeExitMessage(waitErr); !strings.Contains(got, "SIGILL") || !strings.Contains(got, "CPU") {
+		t.Fatalf("message = %q", got)
+	}
+}
+
+func TestOpenCodeOutputIsDrainedBeforeWait(t *testing.T) {
+	dir := t.TempDir()
+	for i := 0; i < 100; i++ {
+		agent, err := startOpenCodeRun("/bin/sh", []string{"-c", `printf '%s\n' '{"type":"text","part":{"type":"text","text":"ok"}}'`}, dir, nil, filepath.Join(dir, "engine.log"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var lines []string
+		scanErr, waitErr := consumeOpenCodeOutput(agent, func(line string) {
+			lines = append(lines, line)
+		})
+		if scanErr != nil {
+			t.Fatalf("iteration %d: scan error = %v", i, scanErr)
+		}
+		if waitErr != nil {
+			t.Fatalf("iteration %d: wait error = %v", i, waitErr)
+		}
+		if len(lines) != 1 {
+			t.Fatalf("iteration %d: got %d lines, want 1", i, len(lines))
 		}
 	}
 }
