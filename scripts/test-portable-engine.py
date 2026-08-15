@@ -36,27 +36,59 @@ class Provider(BaseHTTPRequestHandler):
             self.wfile.write(payload)
             return
 
-        chunks = [
-            {
-                "id": "portable",
-                "object": "chat.completion.chunk",
-                "created": 1,
-                "model": "accounts/fireworks/models/e2e",
-                "choices": [{
-                    "index": 0,
-                    "delta": {"role": "assistant", "content": "FIREWORKS_PORTABLE_OK"},
-                    "finish_reason": None,
-                }],
-            },
-            {
-                "id": "portable",
-                "object": "chat.completion.chunk",
-                "created": 1,
-                "model": "accounts/fireworks/models/e2e",
-                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-                "usage": {"prompt_tokens": 8, "completion_tokens": 3, "total_tokens": 11},
-            },
-        ]
+        if b"TOOL_PORTABLE_TEST" in body and b'"role":"tool"' not in body:
+            arguments = json.dumps({"file_path": "portable-tool-ok.txt", "content": "PORTABLE_TOOL_OK\n"})
+            chunks = [
+                {
+                    "id": "tool",
+                    "object": "chat.completion.chunk",
+                    "created": 1,
+                    "model": "accounts/fireworks/models/e2e",
+                    "choices": [{
+                        "index": 0,
+                        "delta": {
+                            "role": "assistant",
+                            "tool_calls": [{
+                                "index": 0,
+                                "id": "call_write",
+                                "type": "function",
+                                "function": {"name": "write", "arguments": arguments},
+                            }],
+                        },
+                        "finish_reason": None,
+                    }],
+                },
+                {
+                    "id": "tool",
+                    "object": "chat.completion.chunk",
+                    "created": 1,
+                    "model": "accounts/fireworks/models/e2e",
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}],
+                    "usage": {"prompt_tokens": 8, "completion_tokens": 3, "total_tokens": 11},
+                },
+            ]
+        else:
+            chunks = [
+                {
+                    "id": "portable",
+                    "object": "chat.completion.chunk",
+                    "created": 1,
+                    "model": "accounts/fireworks/models/e2e",
+                    "choices": [{
+                        "index": 0,
+                        "delta": {"role": "assistant", "content": "FIREWORKS_PORTABLE_OK"},
+                        "finish_reason": None,
+                    }],
+                },
+                {
+                    "id": "portable",
+                    "object": "chat.completion.chunk",
+                    "created": 1,
+                    "model": "accounts/fireworks/models/e2e",
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                    "usage": {"prompt_tokens": 8, "completion_tokens": 3, "total_tokens": 11},
+                },
+            ]
         payload = ("".join("data: " + json.dumps(chunk) + "\n\n" for chunk in chunks) + "data: [DONE]\n\n").encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -116,6 +148,13 @@ def main():
         assert "FIREWORKS_PORTABLE_OK" in second.stdout, second.stdout
         assert "FIRST_PORTABLE_TEST" in requests[-1], "first turn missing from continued request"
         assert "SECOND_PORTABLE_TEST" in requests[-1], "second turn missing from continued request"
+
+        tool = run("TOOL_PORTABLE_TEST", True)
+        assert tool.returncode == 0, tool.stderr
+        assert "FIREWORKS_PORTABLE_OK" in tool.stdout, tool.stdout
+        tool_path = os.path.join(workspace, "portable-tool-ok.txt")
+        with open(tool_path, encoding="utf-8") as handle:
+            assert handle.read() == "PORTABLE_TOOL_OK\n", "write tool did not create expected file"
 
         failed = run("PROVIDER_ERROR_TEST", True)
         assert failed.returncode != 0, failed.stdout
