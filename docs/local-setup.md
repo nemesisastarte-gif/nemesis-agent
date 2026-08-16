@@ -12,10 +12,10 @@ dépendance glibc, SQLite 100% Go), frontend compilé servi par le backend,
 Redis intégré. **Aucune installation supplémentaire.**
 
 ```bash
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.1/releases/v1.2.1/nemesiscode_1.2.1_amd64.deb
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.1/releases/v1.2.1/SHA256SUMS
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.2/releases/v1.2.2/nemesiscode_1.2.2_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.2/releases/v1.2.2/SHA256SUMS
 sha256sum -c SHA256SUMS
-sudo dpkg -i nemesiscode_1.2.1_amd64.deb
+sudo dpkg -i nemesiscode_1.2.2_amd64.deb
 nemesiscode on       # → http://localhost:5000  (Admin / Admin)
 nemesiscode off      # arrêt
 ```
@@ -114,28 +114,18 @@ TARGET=http://127.0.0.1:8888 pnpm run dev:offline -- --host 0.0.0.0 --port 5173
 5. Le **terminal**, les **fichiers** et les **diffs** de l'interface web
    agissent directement sur la machine hôte.
 
-## Le moteur agent : opencode (embarqué dans le .deb)
+## Le moteur agent portable (embarqué dans le .deb)
 
-Le moteur d'exécution des tâches est **opencode** (https://github.com/anomalyco/opencode,
-MIT) — l'agent de codage open source d'origine de ce projet. Le paquet .deb
-`nemesiscode_*_amd64.deb` **embarque le binaire** (variante « baseline »
-compatible vieux processeurs : SSE2 suffit, aucun AVX requis) : aucune
-installation supplémentaire. En mode développement (sans .deb), le backend
-cherche `opencode` dans le PATH ou via `MCAI_TASKFLOW_LOCAL_AGENT_BIN`.
+Le paquet embarque un moteur opencode statique compilé en Go avec
+`GOAMD64=v1`. Contrairement au binaire officiel récent basé sur Bun, il ne
+requiert ni SSE4.2 ni AVX. L'adaptateur se trouve dans
+`/usr/share/nemesiscode/opencode` et le moteur réel dans
+`/usr/share/nemesiscode/opencode-portable`.
 
-Contrat piloté par le backend :
-
-```text
-opencode run --format json --auto [--continue] --model nemesiscode-ai/<modèle> "<message>"
+```bash
+nemesiscode engine
+nemesiscode doctor
 ```
-
-- `--format json` : événements NDJSON → événements ACP du frontend ;
-- `--auto` : auto-approve les permissions (mode local « confiance ») ;
-- `--continue` : reprise de la session du workspace (flux « continuer ») ;
-- config LLM : `<workspace>/opencode.json` écrit par le backend
-  (provider `nemesiscode-ai` → base_url + api_key du modèle de l'UI).
-
-Détails : [docs/deb-package-engine.md](./deb-package-engine.md).
 
 ## Variables utiles
 

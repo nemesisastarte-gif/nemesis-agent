@@ -55,7 +55,7 @@ func EnsureHost(ctx context.Context, cfg *config.Config, dbc *db.Client, l *slog
 		UserID:    owner.String(),
 		Hostname:  hostID,
 		Name:      hostID,
-		Version:   "nemesis-local-1.2.1",
+		Version:   "nemesis-local-1.2.2",
 		TTL:       taskflow.TTL{Kind: taskflow.TTLForever},
 		CreatedAt: time.Now().Unix(),
 	}

@@ -97,17 +97,17 @@ MonkeyCode, elle réunit dans une même interface :
 ### Option A — paquet Debian tout-en-un (recommandé)
 
 Le paquet stable est référencé par **GitHub Releases** et conservé dans le
-dossier versionné `releases/v1.2.1/` :
+dossier versionné `releases/v1.2.2/` :
 
 ```bash
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.1/releases/v1.2.1/nemesiscode_1.2.1_amd64.deb
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.1/releases/v1.2.1/SHA256SUMS
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.2/releases/v1.2.2/nemesiscode_1.2.2_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.2/releases/v1.2.2/SHA256SUMS
 sha256sum -c SHA256SUMS
-sudo dpkg -i nemesiscode_1.2.1_amd64.deb
+sudo dpkg -i nemesiscode_1.2.2_amd64.deb
 nemesiscode on       # → http://localhost:5000 (Admin / Admin)
 ```
 
-Le backend statique, le frontend et le moteur opencode baseline sont inclus.
+Le backend statique, le frontend et un moteur opencode portable Go (`GOAMD64=v1`, sans SSE4.2 ni AVX) sont inclus.
 Voir [docs/deb-package.md](./docs/deb-package.md).
 
 ### Option B — Mode local depuis les sources
@@ -167,7 +167,7 @@ Variables utiles du mode local (préfixe `MCAI_`) :
 | `MCAI_TASKFLOW_LOCAL_SHELL` | `$SHELL` | shell des terminaux web |
 | `MCAI_TASKFLOW_LOCAL_HOST_ID` | `local-<hostname>` | identifiant de l'hôte local |
 
-> Le paquet `.deb` embarque opencode baseline. Pour un lancement depuis les
+> Le paquet `.deb` embarque le moteur opencode portable. Pour un lancement depuis les
 > sources, installez `opencode` dans le `PATH` ou définissez
 > `MCAI_TASKFLOW_LOCAL_AGENT_BIN`. Design détaillé :
 > [docs/local-mode-design.md](./docs/local-mode-design.md).
