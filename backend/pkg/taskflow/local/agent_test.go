@@ -90,6 +90,28 @@ func TestOpenCodeLineToolUse(t *testing.T) {
 	}
 }
 
+func TestPortableToolEventsAreStreamedSeparately(t *testing.T) {
+	startLine := `{"type":"tool_use_start","part":{"type":"tool","tool":"bash","callID":"call_stream","state":{"status":"in_progress","input":{"command":"pwd"},"title":"bash"}}}`
+	startChunks := openCodeLineToChunks([]byte(startLine))
+	if len(startChunks) != 1 {
+		t.Fatalf("start chunks = %d, want 1", len(startChunks))
+	}
+	start := decodeACPData(t, startChunks[0].Data)["update"].(map[string]any)
+	if start["sessionUpdate"] != "tool_call" || start["status"] != "in_progress" {
+		t.Fatalf("unexpected start event: %+v", start)
+	}
+
+	stopLine := `{"type":"tool_use_stop","part":{"type":"tool","tool":"bash","callID":"call_stream","state":{"status":"completed","input":{"command":"pwd"},"output":"/workspace","title":"bash"}}}`
+	stopChunks := openCodeLineToChunks([]byte(stopLine))
+	if len(stopChunks) != 1 {
+		t.Fatalf("stop chunks = %d, want 1", len(stopChunks))
+	}
+	stop := decodeACPData(t, stopChunks[0].Data)["update"].(map[string]any)
+	if stop["sessionUpdate"] != "tool_call_update" || stop["status"] != "completed" || stop["rawOutput"] != "/workspace" {
+		t.Fatalf("unexpected stop event: %+v", stop)
+	}
+}
+
 func TestOpenCodeLineError(t *testing.T) {
 	// Forme réelle : {"type":"error","error":{"name":"APIError","data":{"message":"..."}}}.
 	line := `{"type":"error","timestamp":1,"sessionID":"s1","error":{"name":"APIError","data":{"message":"Cannot connect to API"}}}`

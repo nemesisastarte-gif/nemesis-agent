@@ -265,7 +265,7 @@ func (c *Client) ensureVM(id string) (*VM, error) {
 			Cores:         int32(runtime.NumCPU()),
 			TTL:           taskflow.TTL{Kind: taskflow.TTLForever},
 			CreatedAt:     info.ModTime().Unix(),
-			Version:       "nemesis-local-1.2.2",
+			Version:       "nemesis-local-1.2.3",
 		},
 		workspace: ws,
 		live:      NewLiveStream(),
@@ -404,7 +404,7 @@ func (c *Client) hostInfo() *taskflow.Host {
 		Memory:   readMemTotal(),
 		Disk:     readDiskTotal(c.root),
 		TTL:      taskflow.TTL{Kind: taskflow.TTLForever},
-		Version:  "nemesis-local-1.2.2",
+		Version:  "nemesis-local-1.2.3",
 	}
 }
 

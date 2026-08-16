@@ -16,7 +16,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${1:-1.2.2}"
+VERSION="${1:-1.2.3}"
 OUT_DIR="$ROOT/dist-deb"
 STAGE="$OUT_DIR/stage"
 DEB="$OUT_DIR/nemesiscode_${VERSION}_amd64.deb"
@@ -54,12 +54,12 @@ if [ "$(git -C "$OC_DIR" rev-parse HEAD)" != "$OC_COMMIT" ]; then
   exit 1
 fi
 git -C "$OC_DIR" apply "$ROOT/packaging/opencode-portable-v0.0.52.patch"
-(cd "$OC_DIR" && gofmt -w cmd internal && go test ./internal/config ./internal/format ./internal/llm/models)
+(cd "$OC_DIR" && gofmt -w cmd internal && go test ./internal/config ./internal/format ./internal/llm/models ./internal/nemesis)
 (cd "$OC_DIR" && GOGC=40 go build -p "${GO_BUILD_P:-2}" \
   -trimpath -buildvcs=false \
-  -ldflags '-s -w -X github.com/sst/opencode/internal/version.Version=0.0.52-nemesis-portable' \
+  -ldflags '-s -w -X github.com/sst/opencode/internal/version.Version=0.0.52-nemesis-streaming' \
   -o "$OUT_DIR/opencode-portable" ./main.go)
-"$OUT_DIR/opencode-portable" --version | grep -Fx '0.0.52-nemesis-portable' >/dev/null
+"$OUT_DIR/opencode-portable" --version | grep -Fx '0.0.52-nemesis-streaming' >/dev/null
 "$OUT_DIR/opencode-portable" --nemesis-protocol-version | grep -Fx '1' >/dev/null
 
 echo "==> [3/4] Assemblage du paquet…"

@@ -147,6 +147,7 @@ func (c *Client) spawnAgent(ctx context.Context, rec *VM, resume bool) error {
 		"NEMESIS_MODEL=" + req.LLM.Model,
 		"NEMESIS_BASE_URL=" + req.LLM.BaseURL,
 		"NEMESIS_INTERFACE_TYPE=" + req.LLM.ApiType,
+		"NEMESIS_THINKING_ENABLED=" + strconv.FormatBool(req.LLM.ThinkingEnabled),
 		"NEMESIS_CONTEXT_LIMIT=" + strconv.Itoa(req.LLM.ContextLimit),
 		"NEMESIS_OUTPUT_LIMIT=" + strconv.Itoa(req.LLM.OutputLimit),
 		"OPENAI_API_KEY=" + req.LLM.ApiKey,

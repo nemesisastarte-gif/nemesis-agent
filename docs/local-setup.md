@@ -12,10 +12,10 @@ dépendance glibc, SQLite 100% Go), frontend compilé servi par le backend,
 Redis intégré. **Aucune installation supplémentaire.**
 
 ```bash
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.2/releases/v1.2.2/nemesiscode_1.2.2_amd64.deb
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.2/releases/v1.2.2/SHA256SUMS
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.3/releases/v1.2.3/nemesiscode_1.2.3_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.3/releases/v1.2.3/SHA256SUMS
 sha256sum -c SHA256SUMS
-sudo dpkg -i nemesiscode_1.2.2_amd64.deb
+sudo dpkg -i nemesiscode_1.2.3_amd64.deb
 nemesiscode on       # → http://localhost:5000  (Admin / Admin)
 nemesiscode off      # arrêt
 ```
@@ -120,7 +120,8 @@ Le paquet embarque un moteur opencode statique compilé en Go avec
 `GOAMD64=v1`. Contrairement au binaire officiel récent basé sur Bun, il ne
 requiert ni SSE4.2 ni AVX. L'adaptateur se trouve dans
 `/usr/share/nemesiscode/opencode` et le moteur réel dans
-`/usr/share/nemesiscode/opencode-portable`.
+`/usr/share/nemesiscode/opencode-portable`. Les réponses, raisonnements et
+appels d'outils sont diffusés en temps réel vers l'interface.
 
 ```bash
 nemesiscode engine

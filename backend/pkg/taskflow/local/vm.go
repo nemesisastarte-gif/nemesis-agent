@@ -57,7 +57,7 @@ func (m *vmManager) Create(ctx context.Context, req *taskflow.CreateVirtualMachi
 		Memory:        req.Memory,
 		TTL:           taskflow.TTL{Kind: taskflow.TTLForever},
 		CreatedAt:     time.Now().Unix(),
-		Version:       "nemesis-local-1.2.2",
+		Version:       "nemesis-local-1.2.3",
 	}
 
 	rec := &VM{

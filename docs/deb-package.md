@@ -11,14 +11,14 @@ tourner NemesisCode sur un PC Linux 64 bits, **sans rien installer d'autre** :
 
 ## Téléchargement et installation
 
-Le paquet courant est conservé dans `releases/v1.2.2/` et référencé par la
+Le paquet courant est conservé dans `releases/v1.2.3/` et référencé par la
 page **GitHub Releases**. Les anciens paquets non fonctionnels ont été retirés :
 
 ```bash
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.2/releases/v1.2.2/nemesiscode_1.2.2_amd64.deb
-curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.2/releases/v1.2.2/SHA256SUMS
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.3/releases/v1.2.3/nemesiscode_1.2.3_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.3/releases/v1.2.3/SHA256SUMS
 sha256sum -c SHA256SUMS
-sudo dpkg -i nemesiscode_1.2.2_amd64.deb
+sudo dpkg -i nemesiscode_1.2.3_amd64.deb
 ```
 
 (En cas de dépendance manquante : `sudo apt-get install -f` ne sera pas
@@ -63,6 +63,11 @@ limites configurés dans l'interface. Il prend en charge Fireworks et les API
 OpenAI-compatible, Anthropic, les outils de fichiers/shell et la reprise de
 session entre les tours.
 
+Les fragments de réponse sont envoyés au navigateur dès leur réception. Les
+appels d'outils apparaissent avec leur état, leurs paramètres et leur résultat ;
+les fragments de raisonnement sont également transmis lorsque le modèle et
+l'interface configurés les fournissent.
+
 ## Changement de port
 
 Par défaut le port est **5000**. Pour changer :
@@ -84,7 +89,7 @@ manuellement si vous voulez tout effacer).
 
 ```bash
 scripts/build-deb.sh          # depuis la racine du dépôt
-# Produit : dist-deb/nemesiscode_1.2.2_amd64.deb
+# Produit : dist-deb/nemesiscode_1.2.3_amd64.deb
 ```
 
 Prérequis : Go 1.25+, Node 22+, pnpm, dpkg-deb. Le binaire est compilé avec

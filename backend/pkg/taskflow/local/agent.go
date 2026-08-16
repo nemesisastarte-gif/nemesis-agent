@@ -185,7 +185,7 @@ func openCodeLineToChunks(line []byte) []*taskflow.TaskChunk {
 			"content":       map[string]any{"type": "text", "text": p.Text},
 		})}
 
-	case "tool_use":
+	case "tool_use", "tool_use_start", "tool_use_stop":
 		var p openCodePart
 		if err := json.Unmarshal(ev.Part, &p); err != nil || p.Tool == "" {
 			return nil
@@ -200,26 +200,35 @@ func openCodeLineToChunks(line []byte) []*taskflow.TaskChunk {
 		}
 		input := decodeRaw(p.State.Input)
 		output := decodeRaw(p.State.Output)
+		start := acpUpdate(map[string]any{
+			"sessionUpdate": "tool_call",
+			"toolCallId":    toolCallID,
+			"title":         title,
+			"input":         input,
+			"rawInput":      input,
+			"status":        "in_progress",
+		})
 		status := p.State.Status
 		if status == "" {
 			status = "completed"
 		}
-		return []*taskflow.TaskChunk{
-			acpUpdate(map[string]any{
-				"sessionUpdate": "tool_call",
-				"toolCallId":    toolCallID,
-				"title":         title,
-				"input":         input,
-				"rawInput":      input,
-				"status":        "in_progress",
-			}),
-			acpUpdate(map[string]any{
-				"sessionUpdate": "tool_call_update",
-				"toolCallId":    toolCallID,
-				"status":        status,
-				"output":        output,
-				"rawOutput":     output,
-			}),
+		stop := acpUpdate(map[string]any{
+			"sessionUpdate": "tool_call_update",
+			"toolCallId":    toolCallID,
+			"title":         title,
+			"status":        status,
+			"input":         input,
+			"rawInput":      input,
+			"output":        output,
+			"rawOutput":     output,
+		})
+		switch ev.Type {
+		case "tool_use_start":
+			return []*taskflow.TaskChunk{start}
+		case "tool_use_stop":
+			return []*taskflow.TaskChunk{stop}
+		default:
+			return []*taskflow.TaskChunk{start, stop}
 		}
 
 	case "error":
