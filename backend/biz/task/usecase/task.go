@@ -638,24 +638,22 @@ func (a *TaskUsecase) Create(ctx context.Context, user *domain.User, req domain.
 
 	mcps := a.buildMCPConfigs(t.ID, runtimeToken)
 
-	// DEBUG: 把准备透传给 taskflow → codingmatrix 的整组 ConfigFile
-	// marshal 成一个 JSON 串、一行日志打出来。仅在 DEBUG 级别开启，
-	// 生产无噪声。
+	// Ne jamais journaliser le contenu : auth.json contient la clé API du
+	// provider. Les chemins suffisent pour diagnostiquer la matérialisation.
 	if a.logger.Enabled(ctx, slog.LevelDebug) {
-		if payload, err := json.Marshal(configs); err != nil {
-			a.logger.WarnContext(ctx, "tasker configs marshal failed",
-				slog.String("task_id", t.ID.String()),
-				slog.Any("err", err))
-		} else {
-			a.logger.DebugContext(ctx, "tasker configs",
-				slog.String("task_id", t.ID.String()),
-				slog.Int("count", len(configs)),
-				slog.String("configs", string(payload)),
-			)
+		paths := make([]string, 0, len(configs))
+		for _, configFile := range configs {
+			paths = append(paths, configFile.Path)
 		}
+		a.logger.DebugContext(ctx, "tasker configs",
+			slog.String("task_id", t.ID.String()),
+			slog.Int("count", len(configs)),
+			slog.Any("paths", paths),
+		)
 	}
 
 	// 存储 CreateTaskReq 到 Redis（10 分钟过期），供 Lifecycle Manager 消费
+	_, runtimeContextLimit, runtimeOutputLimit := modelRuntimeDefaults(m)
 	createTaskReq := &taskflow.CreateTaskReq{
 		ID:           t.ID,
 		VMID:         createdVm.ID,
@@ -664,10 +662,13 @@ func (a *TaskUsecase) Create(ctx context.Context, user *domain.User, req domain.
 		SystemPrompt: req.SystemPrompt,
 		CodingAgent:  coding,
 		LLM: taskflow.LLM{
-			ApiKey:  m.APIKey,
-			BaseURL: m.BaseURL,
-			Model:   m.Model,
-			ApiType: m.InterfaceType,
+			ApiKey:          m.APIKey,
+			BaseURL:         m.BaseURL,
+			Model:           m.Model,
+			ApiType:         m.InterfaceType,
+			ThinkingEnabled: m.ThinkingEnabled,
+			ContextLimit:    runtimeContextLimit,
+			OutputLimit:     runtimeOutputLimit,
 		},
 		Configs:        configs,
 		McpConfigs:     mcps,
@@ -793,6 +794,12 @@ func modelRuntimeDefaults(m *db.Model) (thinking bool, contextLimit int, outputL
 	thinking = m.ThinkingEnabled
 	contextLimit = cmp.Or(m.ContextLimit, 200000)
 	outputLimit = cmp.Or(m.OutputLimit, 32000)
+	// Beaucoup de modèles Fireworks rejettent un max_tokens générique de
+	// 32k alors que le health-check court réussit. 8k est accepté par le
+	// catalogue Fireworks et reste largement suffisant par étape d'agent.
+	if m.Provider == string(consts.ModelProviderFireworks) && outputLimit > 8192 {
+		outputLimit = 8192
+	}
 	return thinking, contextLimit, outputLimit
 }
 
@@ -943,10 +950,14 @@ func (a *TaskUsecase) getCodingConfigs(ctx context.Context, cli consts.CliName, 
 		"api_key":          m.APIKey,
 		"npm_package":      npmPackage,
 		"thinking_enabled": thinkingEnabled,
-		"support_image":    m.SupportImage,
-		"force_reasoning":  strings.HasPrefix(m.Model, "nemesiscode-ultra"),
-		"context_limit":    contextLimit,
-		"output_limit":     outputLimit,
+		// `thinking:{type:disabled}` est une option Anthropic. Avec le
+		// driver OpenAI-compatible elle est envoyée telle quelle à
+		// Fireworks/NVIDIA/etc. et plusieurs providers rejettent ce champ.
+		"thinking_option_supported": consts.InterfaceType(m.InterfaceType) == consts.InterfaceTypeAnthropic,
+		"support_image":             m.SupportImage,
+		"force_reasoning":           strings.HasPrefix(m.Model, "nemesiscode-ultra"),
+		"context_limit":             contextLimit,
+		"output_limit":              outputLimit,
 	}); err != nil {
 		return coding, nil, nil, err
 	}

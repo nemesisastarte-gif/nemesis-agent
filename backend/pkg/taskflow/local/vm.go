@@ -57,7 +57,7 @@ func (m *vmManager) Create(ctx context.Context, req *taskflow.CreateVirtualMachi
 		Memory:        req.Memory,
 		TTL:           taskflow.TTL{Kind: taskflow.TTLForever},
 		CreatedAt:     time.Now().Unix(),
-		Version:       "nemesis-local-1.0",
+		Version:       "nemesis-local-1.2.3",
 	}
 
 	rec := &VM{
@@ -206,11 +206,15 @@ func (m *vmManager) Delete(ctx context.Context, req *taskflow.DeleteVirtualMachi
 	m.c.stopAgent(rec)
 
 	rec.mu.Lock()
+	shells := make([]*Shell, 0, len(rec.shells))
 	for id, s := range rec.shells {
-		s.Stop()
+		shells = append(shells, s)
 		delete(rec.shells, id)
 	}
 	rec.mu.Unlock()
+	for _, shell := range shells {
+		shell.Stop()
+	}
 
 	if !m.c.cfg.KeepWorkspaceOnDelete {
 		if err := os.RemoveAll(rec.workspace); err != nil {
@@ -327,13 +331,19 @@ func (m *vmManager) Terminal(ctx context.Context, req *taskflow.TerminalReq) (ta
 	if rec == nil {
 		return nil, fmt.Errorf("environment not found: %s", req.ID)
 	}
-	shell, err := newShell(ctx, m.c.shell, rec.workspace, req.TerminalID)
+	shell, err := newShell(ctx, m.c.shell, rec.workspace, req.TerminalID, req.Exec, req.TerminalSize)
 	if err != nil {
 		return nil, err
 	}
 	rec.mu.Lock()
+	previous := rec.shells[req.TerminalID]
 	rec.shells[req.TerminalID] = shell
 	rec.mu.Unlock()
+	// Une reconnexion avec le même ID remplace proprement l'ancien WebSocket
+	// au lieu de laisser un shell orphelin.
+	if previous != nil {
+		previous.Stop()
+	}
 	m.c.logger.InfoContext(ctx, "local terminal opened", "vm_id", req.ID, "terminal_id", req.TerminalID)
 	return shell, nil
 }
@@ -351,8 +361,14 @@ func (m *vmManager) TerminalList(ctx context.Context, id string) ([]*taskflow.Te
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
 	out := make([]*taskflow.Terminal, 0, len(rec.shells))
-	for tid := range rec.shells {
-		out = append(out, &taskflow.Terminal{ID: tid, Title: tid, CreatedAt: time.Now().Unix()})
+	for tid, shell := range rec.shells {
+		createdAt := time.Now().Unix()
+		if shell != nil && shell.createdAt > 0 {
+			createdAt = shell.createdAt
+		}
+		out = append(out, &taskflow.Terminal{
+			ID: tid, Title: tid, CreatedAt: createdAt, ConnectedCount: 1,
+		})
 	}
 	return out, nil
 }

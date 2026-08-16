@@ -4322,6 +4322,7 @@ const cn = {
       reset: "上下文已重置",
     },
     error: {
+      unknown: "未知的引擎错误",
       details: "错误详情",
       repairTip: "你可以尝试重新加载开发工具来解决错误",
       repairFailed: "修复失败",

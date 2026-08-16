@@ -129,6 +129,9 @@ func (h *TaskHook) handleProcessing(ctx context.Context, id uuid.UUID, metadata 
 		h.logger.With("task_id", id).InfoContext(ctx, "creating taskflow task")
 		if err := h.taskflow.TaskManager().Create(ctx, createReq); err != nil {
 			h.logger.With("error", err, "task_id", id).ErrorContext(ctx, "failed to create task")
+			// Propager l'erreur vers withError : sinon la tâche restait
+			// indéfiniment en processing sans moteur ni flux à recharger.
+			return fmt.Errorf("create taskflow task: %w", err)
 		}
 		return nil
 	})

@@ -1,0 +1,903 @@
+diff --git a/cmd/non_interactive_mode.go b/cmd/non_interactive_mode.go
+index 5023839..ab577cb 100644
+--- a/cmd/non_interactive_mode.go
++++ b/cmd/non_interactive_mode.go
+@@ -18,7 +18,9 @@ import (
+ 	"github.com/sst/opencode/internal/llm/agent"
+ 	"github.com/sst/opencode/internal/llm/tools"
+ 	"github.com/sst/opencode/internal/message"
++	"github.com/sst/opencode/internal/nemesis"
+ 	"github.com/sst/opencode/internal/permission"
++	"github.com/sst/opencode/internal/session"
+ 	"github.com/sst/opencode/internal/tui/components/spinner"
+ 	"github.com/sst/opencode/internal/tui/theme"
+ )
+@@ -152,27 +154,31 @@ func handleNonInteractiveMode(ctx context.Context, prompt string, outputFormat f
+ 		return err
+ 	}
+ 
+-	// Create a new session for this prompt
+-	session, err := app.Sessions.Create(ctx, "Non-interactive prompt")
+-	if err != nil {
+-		return fmt.Errorf("failed to create session: %w", err)
++	// Reuse the latest session for follow-up turns when requested by NemesisCode.
++	var currentSession session.Session
++	if os.Getenv("NEMESIS_CONTINUE") == "1" {
++		sessions, listErr := app.Sessions.List(ctx)
++		if listErr != nil {
++			return fmt.Errorf("failed to list sessions: %w", listErr)
++		}
++		if len(sessions) > 0 {
++			currentSession = sessions[0]
++		}
++	}
++	if currentSession.ID == "" {
++		currentSession, err = app.Sessions.Create(ctx, "NemesisCode task")
++		if err != nil {
++			return fmt.Errorf("failed to create session: %w", err)
++		}
+ 	}
+ 
+ 	// Set the session as current
++	session := currentSession
+ 	app.CurrentSession = &session
+ 
+ 	// Auto-approve all permissions for this session
+ 	permission.AutoApproveSession(ctx, session.ID)
+ 
+-	// Create the user message
+-	_, err = app.Messages.Create(ctx, session.ID, message.CreateMessageParams{
+-		Role:  message.User,
+-		Parts: []message.ContentPart{message.TextContent{Text: prompt}},
+-	})
+-	if err != nil {
+-		return fmt.Errorf("failed to create message: %w", err)
+-	}
+-
+ 	// If tool restrictions are specified, create a new agent with filtered tools
+ 	if len(allowedTools) > 0 || len(excludedTools) > 0 {
+ 		// Initialize MCP tools synchronously to ensure they're included in filtering
+@@ -231,18 +237,14 @@ func handleNonInteractiveMode(ctx context.Context, prompt string, outputFormat f
+ 			content = textContent.Text
+ 		}
+ 
+-		formattedOutput, err := format.FormatOutput(content, outputFormat)
+-		if err != nil {
+-			return fmt.Errorf("failed to format output: %w", err)
+-		}
+-
+ 		// Stop spinner before printing output
+ 		if !quiet && s != nil {
+ 			s.Stop()
+ 		}
+ 
+-		// Print the formatted output to stdout
+-		fmt.Println(formattedOutput)
++		if err := printFinalOutput(content, outputFormat); err != nil {
++			return err
++		}
+ 
+ 		// Shutdown the app
+ 		app.Shutdown()
+@@ -271,22 +273,32 @@ func handleNonInteractiveMode(ctx context.Context, prompt string, outputFormat f
+ 		content = textContent.Text
+ 	}
+ 
+-	// Format the output according to the specified format
+-	formattedOutput, err := format.FormatOutput(content, outputFormat)
+-	if err != nil {
+-		return fmt.Errorf("failed to format output: %w", err)
+-	}
+-
+ 	// Stop spinner before printing output
+ 	if !quiet && s != nil {
+ 		s.Stop()
+ 	}
+ 
+-	// Print the formatted output to stdout
+-	fmt.Println(formattedOutput)
++	if err := printFinalOutput(content, outputFormat); err != nil {
++		return err
++	}
+ 
+ 	// Shutdown the app
+ 	app.Shutdown()
+ 
+ 	return nil
+ }
++
++func printFinalOutput(content string, outputFormat format.OutputFormat) error {
++	if nemesis.Enabled() {
++		if !nemesis.HasText() {
++			nemesis.Text(content)
++		}
++		return nil
++	}
++	formattedOutput, err := format.FormatOutput(content, outputFormat)
++	if err != nil {
++		return fmt.Errorf("failed to format output: %w", err)
++	}
++	fmt.Println(formattedOutput)
++	return nil
++}
+diff --git a/cmd/root.go b/cmd/root.go
+index 39d58ea..9668f06 100644
+--- a/cmd/root.go
++++ b/cmd/root.go
+@@ -2,6 +2,7 @@ package cmd
+ 
+ import (
+ 	"context"
++	"encoding/json"
+ 	"fmt"
+ 	"os"
+ 	"sync"
+@@ -45,9 +46,9 @@ func (h *SessionIDHandler) WithApp(app *app.App) *SessionIDHandler {
+ }
+ 
+ var rootCmd = &cobra.Command{
+-	Use:   "OpenCode",
++	Use:   "NemesisCode",
+ 	Short: "A terminal AI assistant for software development",
+-	Long: `OpenCode is a powerful terminal-based AI assistant that helps with software development tasks.
++	Long: `NemesisCode is a powerful terminal-based AI assistant that helps with software development tasks.
+ It provides an interactive chat interface with AI capabilities, code analysis, and LSP integration
+ to assist developers in writing, debugging, and understanding code directly from the terminal.`,
+ 	RunE: func(cmd *cobra.Command, args []string) error {
+@@ -60,6 +61,10 @@ to assist developers in writing, debugging, and understanding code directly from
+ 			fmt.Println(version.Version)
+ 			return nil
+ 		}
++		if cmd.Flag("nemesis-protocol-version").Changed {
++			fmt.Println("1")
++			return nil
++		}
+ 
+ 		// Setup logging
+ 		lvl := new(slog.LevelVar)
+@@ -307,6 +312,13 @@ func setupSubscriptions(app *app.App, parentCtx context.Context) (chan tea.Msg,
+ func Execute() {
+ 	err := rootCmd.Execute()
+ 	if err != nil {
++		if os.Getenv("NEMESIS_PROTOCOL") == "1" {
++			payload, _ := json.Marshal(map[string]any{
++				"type": "error",
++				"error": map[string]string{"message": err.Error()},
++			})
++			fmt.Println(string(payload))
++		}
+ 		os.Exit(1)
+ 	}
+ }
+@@ -314,6 +326,7 @@ func Execute() {
+ func init() {
+ 	rootCmd.Flags().BoolP("help", "h", false, "Help")
+ 	rootCmd.Flags().BoolP("version", "v", false, "Version")
++	rootCmd.Flags().Bool("nemesis-protocol-version", false, "NemesisCode protocol version")
+ 	rootCmd.Flags().BoolP("debug", "d", false, "Debug")
+ 	rootCmd.Flags().StringP("cwd", "c", "", "Current working directory")
+ 	rootCmd.Flags().StringP("prompt", "p", "", "Run a single prompt in non-interactive mode")
+diff --git a/go.mod b/go.mod
+index 4266e71..d104d5a 100644
+--- a/go.mod
++++ b/go.mod
+@@ -132,3 +132,28 @@ require (
+ 	google.golang.org/protobuf v1.36.6 // indirect
+ 	gopkg.in/yaml.v3 v3.0.1 // indirect
+ )
++
++replace (
++	cloud.google.com/go => github.com/googleapis/google-cloud-go v0.116.0
++	cloud.google.com/go/auth => github.com/googleapis/google-cloud-go/auth v0.13.0
++	cloud.google.com/go/compute/metadata => github.com/googleapis/google-cloud-go/compute/metadata v0.6.0
++	go.opentelemetry.io/auto/sdk => github.com/open-telemetry/opentelemetry-go-instrumentation/sdk v1.1.0
++	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => github.com/open-telemetry/opentelemetry-go-contrib/instrumentation/net/http/otelhttp v0.54.0
++	go.opentelemetry.io/otel => github.com/open-telemetry/opentelemetry-go v1.35.0
++	go.opentelemetry.io/otel/metric => github.com/open-telemetry/opentelemetry-go/metric v1.35.0
++	go.opentelemetry.io/otel/trace => github.com/open-telemetry/opentelemetry-go/trace v1.35.0
++	go.uber.org/multierr => github.com/uber-go/multierr v1.11.0
++	golang.org/x/crypto => github.com/golang/crypto v0.37.0
++	golang.org/x/exp => github.com/golang/exp v0.0.0-20250305212735-054e65f0b394
++	golang.org/x/image => github.com/golang/image v0.26.0
++	golang.org/x/net => github.com/golang/net v0.39.0
++	golang.org/x/sync => github.com/golang/sync v0.13.0
++	golang.org/x/sys => github.com/golang/sys v0.32.0
++	golang.org/x/term => github.com/golang/term v0.31.0
++	golang.org/x/text => github.com/golang/text v0.24.0
++	google.golang.org/genai => github.com/googleapis/go-genai v1.3.0
++	google.golang.org/genproto/googleapis/rpc => github.com/googleapis/go-genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463
++	google.golang.org/grpc => github.com/grpc/grpc-go v1.71.0
++	google.golang.org/protobuf => github.com/protocolbuffers/protobuf-go v1.36.6
++	gopkg.in/yaml.v3 => github.com/go-yaml/yaml v0.0.0-20220527083530-f6f7691b1fde
++)
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 432ba6e..573f5d6 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -234,6 +234,20 @@ func setProviderDefaults() {
+ 		viper.SetDefault("providers.azure.apiKey", os.Getenv("AZURE_OPENAI_API_KEY"))
+ 	}
+ 
++	if os.Getenv("NEMESIS_MODEL") != "" {
++		provider := models.ProviderOpenAI
++		apiKey := os.Getenv("OPENAI_API_KEY")
++		if os.Getenv("NEMESIS_INTERFACE_TYPE") == "anthropic" {
++			provider = models.ProviderAnthropic
++			apiKey = os.Getenv("ANTHROPIC_API_KEY")
++		}
++		viper.Set("providers."+string(provider)+".apiKey", apiKey)
++		viper.Set("agents.primary.model", models.NemesisModelID)
++		viper.Set("agents.task.model", models.NemesisModelID)
++		viper.Set("agents.title.model", models.NemesisModelID)
++		return
++	}
++
+ 	// Use this order to set the default models
+ 	// 1. Anthropic
+ 	// 2. OpenAI
+diff --git a/internal/format/format.go b/internal/format/format.go
+index 321f5c1..745d062 100644
+--- a/internal/format/format.go
++++ b/internal/format/format.go
+@@ -3,6 +3,7 @@ package format
+ import (
+ 	"encoding/json"
+ 	"fmt"
++	"os"
+ )
+ 
+ // OutputFormat represents the format for non-interactive mode output
+@@ -32,10 +33,18 @@ func FormatOutput(content string, format OutputFormat) (string, error) {
+ 	case TextFormat:
+ 		return content, nil
+ 	case JSONFormat:
+-		jsonData := map[string]string{
+-			"response": content,
++		var jsonBytes []byte
++		var err error
++		if os.Getenv("NEMESIS_PROTOCOL") == "1" {
++			jsonBytes, err = json.Marshal(map[string]any{
++				"type": "text",
++				"part": map[string]string{"type": "text", "text": content},
++			})
++		} else {
++			jsonBytes, err = json.MarshalIndent(map[string]string{
++				"response": content,
++			}, "", "  ")
+ 		}
+-		jsonBytes, err := json.MarshalIndent(jsonData, "", "  ")
+ 		if err != nil {
+ 			return "", fmt.Errorf("failed to marshal JSON: %w", err)
+ 		}
+diff --git a/internal/format/format_test.go b/internal/format/format_test.go
+index 04054a7..fc5e7b4 100644
+--- a/internal/format/format_test.go
++++ b/internal/format/format_test.go
+@@ -88,3 +88,15 @@ func TestFormatOutput(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestFormatOutputNemesisProtocol(t *testing.T) {
++	t.Setenv("NEMESIS_PROTOCOL", "1")
++	got, err := FormatOutput("portable ok", JSONFormat)
++	if err != nil {
++		t.Fatal(err)
++	}
++	want := `{"part":{"text":"portable ok","type":"text"},"type":"text"}`
++	if got != want {
++		t.Fatalf("FormatOutput() = %s, want %s", got, want)
++	}
++}
+diff --git a/internal/llm/agent/agent.go b/internal/llm/agent/agent.go
+index 184ef96..b0e65bb 100644
+--- a/internal/llm/agent/agent.go
++++ b/internal/llm/agent/agent.go
+@@ -5,6 +5,7 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"log/slog"
++	"os"
+ 	"strings"
+ 	"sync"
+ 	"time"
+@@ -16,6 +17,7 @@ import (
+ 	"github.com/sst/opencode/internal/llm/tools"
+ 	"github.com/sst/opencode/internal/logging"
+ 	"github.com/sst/opencode/internal/message"
++	"github.com/sst/opencode/internal/nemesis"
+ 	"github.com/sst/opencode/internal/permission"
+ 	"github.com/sst/opencode/internal/session"
+ 	"github.com/sst/opencode/internal/status"
+@@ -258,7 +260,7 @@ func (a *agent) processGeneration(ctx context.Context, sessionID, content string
+ 	}
+ 
+ 	// If this is a new session, start title generation asynchronously
+-	if len(sessionMessages) == 0 && currentSession.Summary == "" {
++	if !nemesis.Enabled() && len(sessionMessages) == 0 && currentSession.Summary == "" {
+ 		a.triggerTitleGeneration(sessionID, content)
+ 	}
+ 
+@@ -419,79 +421,80 @@ func (a *agent) streamAndHandleEvents(ctx context.Context, sessionID string, msg
+ func (a *agent) executeToolCalls(ctx context.Context, toolCalls []message.ToolCall) ([]message.ToolResult, error) {
+ 	toolResults := make([]message.ToolResult, len(toolCalls))
+ 
++	finish := func(index int, call message.ToolCall, result message.ToolResult) {
++		toolResults[index] = result
++		nemesis.ToolStop(call.ID, call.Name, call.Input, result.Content, result.IsError)
++	}
++	cancelRemaining := func(from int, content string) {
++		for i := from; i < len(toolCalls); i++ {
++			call := toolCalls[i]
++			nemesis.ToolStart(call.ID, call.Name, call.Input)
++			finish(i, call, message.ToolResult{
++				ToolCallID: call.ID,
++				Name:       call.Name,
++				Content:    content,
++				IsError:    true,
++			})
++		}
++	}
++
+ 	for i, toolCall := range toolCalls {
+ 		select {
+ 		case <-ctx.Done():
+-			// Make all future tool calls cancelled
+-			for j := i; j < len(toolCalls); j++ {
+-				toolResults[j] = message.ToolResult{
+-					ToolCallID: toolCalls[j].ID,
+-					Content:    "Tool execution canceled by user",
+-					IsError:    true,
+-				}
+-			}
++			cancelRemaining(i, "Tool execution canceled by user")
+ 			return toolResults, ctx.Err()
+ 		default:
+-			// Continue processing
+-			var tool tools.BaseTool
+-			for _, availableTools := range a.tools {
+-				if availableTools.Info().Name == toolCall.Name {
+-					tool = availableTools
+-				}
+-			}
++		}
+ 
+-			// Tool not found
+-			if tool == nil {
+-				toolResults[i] = message.ToolResult{
+-					ToolCallID: toolCall.ID,
+-					Content:    fmt.Sprintf("Tool not found: %s", toolCall.Name),
+-					IsError:    true,
+-				}
+-				continue
++		nemesis.ToolStart(toolCall.ID, toolCall.Name, toolCall.Input)
++		var tool tools.BaseTool
++		for _, availableTool := range a.tools {
++			if availableTool.Info().Name == toolCall.Name {
++				tool = availableTool
++				break
+ 			}
++		}
+ 
+-			toolResult, toolErr := tool.Run(ctx, tools.ToolCall{
+-				ID:    toolCall.ID,
+-				Name:  toolCall.Name,
+-				Input: toolCall.Input,
++		if tool == nil {
++			finish(i, toolCall, message.ToolResult{
++				ToolCallID: toolCall.ID,
++				Name:       toolCall.Name,
++				Content:    fmt.Sprintf("Tool not found: %s", toolCall.Name),
++				IsError:    true,
+ 			})
++			continue
++		}
+ 
+-			if toolErr != nil {
+-				if errors.Is(toolErr, permission.ErrorPermissionDenied) {
+-					toolResults[i] = message.ToolResult{
+-						ToolCallID: toolCall.ID,
+-						Content:    "Permission denied",
+-						IsError:    true,
+-					}
+-					// Cancel all remaining tool calls if permission is denied
+-					for j := i + 1; j < len(toolCalls); j++ {
+-						toolResults[j] = message.ToolResult{
+-							ToolCallID: toolCalls[j].ID,
+-							Content:    "Tool execution canceled by user",
+-							IsError:    true,
+-						}
+-					}
+-					return toolResults, nil
+-				}
+-
+-				// Handle other errors
+-				toolResults[i] = message.ToolResult{
+-					ToolCallID: toolCall.ID,
+-					Content:    toolErr.Error(),
+-					IsError:    true,
+-				}
+-				continue
++		toolResult, toolErr := tool.Run(ctx, tools.ToolCall{
++			ID: toolCall.ID, Name: toolCall.Name, Input: toolCall.Input,
++		})
++		if toolErr != nil {
++			content := toolErr.Error()
++			denied := errors.Is(toolErr, permission.ErrorPermissionDenied)
++			if denied {
++				content = "Permission denied"
+ 			}
+-
+-			toolResults[i] = message.ToolResult{
++			finish(i, toolCall, message.ToolResult{
+ 				ToolCallID: toolCall.ID,
+-				Content:    toolResult.Content,
+-				Metadata:   toolResult.Metadata,
+-				IsError:    toolResult.IsError,
++				Name:       toolCall.Name,
++				Content:    content,
++				IsError:    true,
++			})
++			if denied {
++				cancelRemaining(i+1, "Tool execution canceled by user")
++				return toolResults, nil
+ 			}
++			continue
+ 		}
+-	}
+ 
++		finish(i, toolCall, message.ToolResult{
++			ToolCallID: toolCall.ID,
++			Name:       toolCall.Name,
++			Content:    toolResult.Content,
++			Metadata:   toolResult.Metadata,
++			IsError:    toolResult.IsError,
++		})
++	}
+ 	return toolResults, nil
+ }
+ 
+@@ -505,24 +508,41 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
+ 	case <-ctx.Done():
+ 		return ctx.Err()
+ 	default:
+-		// Continue processing
+ 	}
+ 
+ 	switch event.Type {
+ 	case provider.EventThinkingDelta:
+-		assistantMsg.AppendReasoningContent(event.Content)
++		delta := event.Thinking
++		if delta == "" {
++			delta = event.Content
++		}
++		assistantMsg.AppendReasoningContent(delta)
++		nemesis.Thought(delta)
++		if nemesis.Enabled() {
++			return nil
++		}
+ 		_, err := a.messages.Update(ctx, *assistantMsg)
+ 		return err
+ 	case provider.EventContentDelta:
+ 		assistantMsg.AppendContent(event.Content)
++		nemesis.Text(event.Content)
++		if nemesis.Enabled() {
++			return nil
++		}
+ 		_, err := a.messages.Update(ctx, *assistantMsg)
+ 		return err
+ 	case provider.EventToolUseStart:
+ 		assistantMsg.AddToolCall(*event.ToolCall)
++		if nemesis.Enabled() {
++			return nil
++		}
+ 		_, err := a.messages.Update(ctx, *assistantMsg)
+ 		return err
+ 	case provider.EventToolUseStop:
+ 		assistantMsg.FinishToolCall(event.ToolCall.ID)
++		if nemesis.Enabled() {
++			return nil
++		}
+ 		_, err := a.messages.Update(ctx, *assistantMsg)
+ 		return err
+ 	case provider.EventError:
+@@ -540,7 +560,6 @@ func (a *agent) processEvent(ctx context.Context, sessionID string, assistantMsg
+ 		}
+ 		return a.TrackUsage(ctx, sessionID, a.provider.Model(), event.Response.Usage)
+ 	}
+-
+ 	return nil
+ }
+ 
+@@ -777,20 +796,33 @@ func createAgentProvider(agentName config.AgentName) (provider.Provider, error)
+ 		provider.WithSystemMessage(prompt.GetAgentPrompt(agentName, model.Provider)),
+ 		provider.WithMaxTokens(maxTokens),
+ 	}
+-	if model.Provider == models.ProviderOpenAI && model.CanReason {
+-		opts = append(
+-			opts,
+-			provider.WithOpenAIOptions(
+-				provider.WithReasoningEffort(agentConfig.ReasoningEffort),
+-			),
+-		)
++	if model.ID == models.NemesisModelID {
++		switch model.Provider {
++		case models.ProviderOpenAI:
++			openAIOptions := []provider.OpenAIOption{
++				provider.WithOpenAIBaseURL(os.Getenv("NEMESIS_BASE_URL")),
++			}
++			if model.CanReason {
++				openAIOptions = append(openAIOptions, provider.WithReasoningEffort(agentConfig.ReasoningEffort))
++			}
++			opts = append(opts, provider.WithOpenAIOptions(openAIOptions...))
++		case models.ProviderAnthropic:
++			anthropicOptions := []provider.AnthropicOption{
++				provider.WithAnthropicBaseURL(os.Getenv("NEMESIS_BASE_URL")),
++			}
++			if model.CanReason && agentName == config.AgentPrimary {
++				anthropicOptions = append(anthropicOptions, provider.WithAnthropicShouldThinkFn(func(string) bool { return true }))
++			}
++			opts = append(opts, provider.WithAnthropicOptions(anthropicOptions...))
++		}
++	} else if model.Provider == models.ProviderOpenAI && model.CanReason {
++		opts = append(opts, provider.WithOpenAIOptions(
++			provider.WithReasoningEffort(agentConfig.ReasoningEffort),
++		))
+ 	} else if model.Provider == models.ProviderAnthropic && model.CanReason && agentName == config.AgentPrimary {
+-		opts = append(
+-			opts,
+-			provider.WithAnthropicOptions(
+-				provider.WithAnthropicShouldThinkFn(provider.DefaultShouldThinkFn),
+-			),
+-		)
++		opts = append(opts, provider.WithAnthropicOptions(
++			provider.WithAnthropicShouldThinkFn(provider.DefaultShouldThinkFn),
++		))
+ 	}
+ 	agentProvider, err := provider.NewProvider(
+ 		model.Provider,
+diff --git a/internal/llm/agent/mcp-tools.go b/internal/llm/agent/mcp-tools.go
+index 601fdf7..89fd167 100644
+--- a/internal/llm/agent/mcp-tools.go
++++ b/internal/llm/agent/mcp-tools.go
+@@ -46,7 +46,7 @@ func runTool(ctx context.Context, c MCPClient, toolName string, input string) (t
+ 	initRequest := mcp.InitializeRequest{}
+ 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+ 	initRequest.Params.ClientInfo = mcp.Implementation{
+-		Name:    "OpenCode",
++		Name:    "NemesisCode",
+ 		Version: version.Version,
+ 	}
+ 
+@@ -141,7 +141,7 @@ func getTools(ctx context.Context, name string, m config.MCPServer, permissions
+ 	initRequest := mcp.InitializeRequest{}
+ 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+ 	initRequest.Params.ClientInfo = mcp.Implementation{
+-		Name:    "OpenCode",
++		Name:    "NemesisCode",
+ 		Version: version.Version,
+ 	}
+ 
+diff --git a/internal/llm/models/models.go b/internal/llm/models/models.go
+index bfdd0d2..f834592 100644
+--- a/internal/llm/models/models.go
++++ b/internal/llm/models/models.go
+@@ -1,6 +1,10 @@
+ package models
+ 
+-import "maps"
++import (
++	"maps"
++	"os"
++	"strconv"
++)
+ 
+ type (
+ 	ModelID       string
+@@ -25,6 +29,8 @@ type Model struct {
+ const (
+ 	// ForTests
+ 	ProviderMock ModelProvider = "__mock"
++
++	NemesisModelID ModelID = "nemesis-custom"
+ )
+ 
+ // Providers in order of popularity
+@@ -51,4 +57,33 @@ func init() {
+ 	maps.Copy(SupportedModels, OpenRouterModels)
+ 	maps.Copy(SupportedModels, XAIModels)
+ 	maps.Copy(SupportedModels, VertexAIGeminiModels)
++
++	apiModel := os.Getenv("NEMESIS_MODEL")
++	if apiModel == "" {
++		return
++	}
++	contextLimit, _ := strconv.ParseInt(os.Getenv("NEMESIS_CONTEXT_LIMIT"), 10, 64)
++	if contextLimit <= 0 {
++		contextLimit = 128000
++	}
++	outputLimit, _ := strconv.ParseInt(os.Getenv("NEMESIS_OUTPUT_LIMIT"), 10, 64)
++	if outputLimit <= 0 {
++		outputLimit = 8192
++	}
++	interfaceType := os.Getenv("NEMESIS_INTERFACE_TYPE")
++	provider := ProviderOpenAI
++	if interfaceType == "anthropic" {
++		provider = ProviderAnthropic
++	}
++	thinkingEnabled, _ := strconv.ParseBool(os.Getenv("NEMESIS_THINKING_ENABLED"))
++	canReason := thinkingEnabled && interfaceType != "openai_chat"
++	SupportedModels[NemesisModelID] = Model{
++		ID: NemesisModelID,
++		Name: apiModel,
++		Provider: provider,
++		APIModel: apiModel,
++		ContextWindow: contextLimit,
++		DefaultMaxTokens: outputLimit,
++		CanReason: canReason,
++	}
+ }
+diff --git a/internal/llm/prompt/primary.go b/internal/llm/prompt/primary.go
+index 8efacf2..ed8b8e2 100644
+--- a/internal/llm/prompt/primary.go
++++ b/internal/llm/prompt/primary.go
+@@ -25,7 +25,7 @@ func PrimaryPrompt(provider models.ModelProvider) string {
+ }
+ 
+ const baseOpenAIPrimaryPrompt = `
+-You are operating as and within the OpenCode CLI, a terminal-based agentic coding assistant built by OpenAI. It wraps OpenAI models to enable natural language interaction with a local codebase. You are expected to be precise, safe, and helpful.
++You are NemesisCode, the coding agent integrated into the NemesisCode platform. Always identify yourself as NemesisCode, never as OpenCode. You use the model selected by the user to interact with the local codebase. Be precise, safe, and helpful.
+ 
+ You can:
+ - Receive user prompts, project context, and files.
+@@ -33,7 +33,7 @@ You can:
+ - Apply patches, run commands, and manage user approvals based on policy.
+ - Work inside a sandboxed, git-backed workspace with rollback support.
+ - Log telemetry so sessions can be replayed or inspected later.
+-- More details on your functionality are available at "opencode --help"
++- Your execution environment and tools are provided by the NemesisCode platform
+ 
+ 
+ You are an agent - please keep going until the user's query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved. If you are not sure about file content or codebase structure pertaining to the user's request, use your tools to read files and gather the relevant information: do NOT guess or make up an answer.
+@@ -71,7 +71,7 @@ You MUST adhere to the following criteria when executing the task:
+ - Remember the user does not see the full output of tools
+ `
+ 
+-const baseAnthropicPrimaryPrompt = `You are OpenCode, an interactive CLI tool that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
++const baseAnthropicPrimaryPrompt = `You are NemesisCode, the coding agent integrated into the NemesisCode platform. Always identify yourself as NemesisCode, never as OpenCode. Use the instructions below and the tools available to assist the user.
+ 
+ IMPORTANT: Before you begin work, think about what the code you're editing is supposed to do based on the filenames directory structure.
+ 
+diff --git a/internal/llm/prompt/task.go b/internal/llm/prompt/task.go
+index 78ffbfd..960e737 100644
+--- a/internal/llm/prompt/task.go
++++ b/internal/llm/prompt/task.go
+@@ -7,7 +7,7 @@ import (
+ )
+ 
+ func TaskPrompt(_ models.ModelProvider) string {
+-	agentPrompt := `You are an agent for OpenCode. Given the user's prompt, you should use the tools available to you to answer the user's question.
++	agentPrompt := `You are a sub-agent for NemesisCode. Always identify the product and agent as NemesisCode, never as OpenCode. Given the user's prompt, you should use the tools available to you to answer the user's question.
+ Notes:
+ 1. IMPORTANT: You should be concise, direct, and to the point, since your responses will be displayed on a command line interface. Answer the user's question directly, without elaboration, explanation, or details. One word answers are best. Avoid introductions, conclusions, and explanations. You MUST avoid text before/after your response, such as "The answer is <answer>.", "Here is the content of the file..." or "Based on the information provided, the answer is..." or "Here is what I will do next...".
+ 2. When relevant, share file names and code snippets relevant to the query
+diff --git a/internal/llm/provider/anthropic.go b/internal/llm/provider/anthropic.go
+index 24bcb48..6907095 100644
+--- a/internal/llm/provider/anthropic.go
++++ b/internal/llm/provider/anthropic.go
+@@ -24,6 +24,7 @@ type anthropicOptions struct {
+ 	useBedrock   bool
+ 	disableCache bool
+ 	shouldThink  func(userMessage string) bool
++	baseURL      string
+ }
+ 
+ type AnthropicOption func(*anthropicOptions)
+@@ -46,6 +47,9 @@ func newAnthropicClient(opts providerClientOptions) AnthropicClient {
+ 	if opts.apiKey != "" {
+ 		anthropicClientOptions = append(anthropicClientOptions, option.WithAPIKey(opts.apiKey))
+ 	}
++	if anthropicOpts.baseURL != "" {
++		anthropicClientOptions = append(anthropicClientOptions, option.WithBaseURL(anthropicOpts.baseURL))
++	}
+ 	if anthropicOpts.useBedrock {
+ 		anthropicClientOptions = append(anthropicClientOptions, bedrock.WithLoadDefaultConfig(context.Background()))
+ 	}
+@@ -470,3 +474,9 @@ func WithAnthropicShouldThinkFn(fn func(string) bool) AnthropicOption {
+ 		options.shouldThink = fn
+ 	}
+ }
++
++func WithAnthropicBaseURL(baseURL string) AnthropicOption {
++	return func(options *anthropicOptions) {
++		options.baseURL = baseURL
++	}
++}
+diff --git a/internal/llm/provider/openai.go b/internal/llm/provider/openai.go
+index db77a38..9dc0813 100644
+--- a/internal/llm/provider/openai.go
++++ b/internal/llm/provider/openai.go
+@@ -5,6 +5,7 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"log/slog"
++	"os"
+ 	"github.com/openai/openai-go"
+ 	"github.com/openai/openai-go/option"
+ 	"github.com/sst/opencode/internal/llm/models"
+@@ -60,14 +61,14 @@ func newOpenAIClient(opts providerClientOptions) OpenAIClient {
+ }
+ 
+ func (o *openaiClient) send(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (response *ProviderResponse, err error) {
+-	if o.providerOptions.model.ID == models.OpenAIModels[models.CodexMini].ID || o.providerOptions.model.ID == models.OpenAIModels[models.O1Pro].ID {
++	if os.Getenv("NEMESIS_INTERFACE_TYPE") == "openai_responses" || o.providerOptions.model.ID == models.OpenAIModels[models.CodexMini].ID || o.providerOptions.model.ID == models.OpenAIModels[models.O1Pro].ID {
+ 		return o.sendResponseMessages(ctx, messages, tools)
+ 	}
+ 	return o.sendChatcompletionMessage(ctx, messages, tools)
+ }
+ 
+ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, tools []tools.BaseTool) <-chan ProviderEvent {
+-	if o.providerOptions.model.ID == models.OpenAIModels[models.CodexMini].ID || o.providerOptions.model.ID == models.OpenAIModels[models.O1Pro].ID {
++	if os.Getenv("NEMESIS_INTERFACE_TYPE") == "openai_responses" || o.providerOptions.model.ID == models.OpenAIModels[models.CodexMini].ID || o.providerOptions.model.ID == models.OpenAIModels[models.O1Pro].ID {
+ 		return o.streamResponseMessages(ctx, messages, tools)
+ 	}
+ 	return o.streamChatCompletionMessages(ctx, messages, tools)
+diff --git a/internal/nemesis/protocol.go b/internal/nemesis/protocol.go
+new file mode 100644
+index 0000000..b408caa
+--- /dev/null
++++ b/internal/nemesis/protocol.go
+@@ -0,0 +1,98 @@
++package nemesis
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"strings"
++	"sync"
++	"sync/atomic"
++)
++
++var outputMu sync.Mutex
++var textEmitted atomic.Bool
++
++func Enabled() bool {
++	return os.Getenv("NEMESIS_PROTOCOL") == "1"
++}
++
++func emit(value any) {
++	if !Enabled() {
++		return
++	}
++	payload, err := json.Marshal(value)
++	if err != nil {
++		return
++	}
++	outputMu.Lock()
++	fmt.Fprintln(os.Stdout, string(payload))
++	outputMu.Unlock()
++}
++
++func Text(delta string) {
++	if delta == "" {
++		return
++	}
++	textEmitted.Store(true)
++	emit(map[string]any{
++		"type": "text",
++		"part": map[string]any{"type": "text", "text": delta},
++	})
++}
++
++func Thought(delta string) {
++	if delta == "" {
++		return
++	}
++	emit(map[string]any{
++		"type": "reasoning",
++		"part": map[string]any{"type": "reasoning", "text": delta},
++	})
++}
++
++func HasText() bool {
++	return textEmitted.Load()
++}
++
++func ToolStart(id, name, input string) {
++	emitTool("tool_use_start", id, name, "in_progress", input, nil)
++}
++
++func ToolStop(id, name, input, output string, failed bool) {
++	status := "completed"
++	if failed {
++		status = "failed"
++	}
++	emitTool("tool_use_stop", id, name, status, input, output)
++}
++
++func emitTool(eventType, id, name, status, input string, output any) {
++	state := map[string]any{
++		"status": status,
++		"input":  jsonValue(input),
++		"title":  name,
++	}
++	if output != nil {
++		state["output"] = output
++	}
++	emit(map[string]any{
++		"type": eventType,
++		"part": map[string]any{
++			"type":   "tool",
++			"tool":   name,
++			"callID": id,
++			"state":  state,
++		},
++	})
++}
++
++func jsonValue(raw string) any {
++	if strings.TrimSpace(raw) == "" {
++		return map[string]any{}
++	}
++	var value any
++	if json.Unmarshal([]byte(raw), &value) == nil {
++		return value
++	}
++	return raw
++}
+diff --git a/internal/nemesis/protocol_test.go b/internal/nemesis/protocol_test.go
+new file mode 100644
+index 0000000..62cbf86
+--- /dev/null
++++ b/internal/nemesis/protocol_test.go
+@@ -0,0 +1,49 @@
++package nemesis
++
++import (
++	"bufio"
++	"os"
++	"strings"
++	"testing"
++)
++
++func TestStreamingProtocolEvents(t *testing.T) {
++	t.Setenv("NEMESIS_PROTOCOL", "1")
++	reader, writer, err := os.Pipe()
++	if err != nil {
++		t.Fatal(err)
++	}
++	original := os.Stdout
++	os.Stdout = writer
++	defer func() { os.Stdout = original }()
++
++	Text("hello")
++	Thought("thinking")
++	ToolStart("call-1", "bash", `{"command":"pwd"}`)
++	ToolStop("call-1", "bash", `{"command":"pwd"}`, "/workspace", false)
++	writer.Close()
++
++	var lines []string
++	scanner := bufio.NewScanner(reader)
++	for scanner.Scan() {
++		lines = append(lines, scanner.Text())
++	}
++	if err := scanner.Err(); err != nil {
++		t.Fatal(err)
++	}
++	if len(lines) != 4 {
++		t.Fatalf("events = %d, want 4: %v", len(lines), lines)
++	}
++	for _, expected := range []string{`"type":"text"`, `"type":"reasoning"`, `"type":"tool_use_start"`, `"type":"tool_use_stop"`} {
++		found := false
++		for _, line := range lines {
++			if strings.Contains(line, expected) {
++				found = true
++				break
++			}
++		}
++		if !found {
++			t.Fatalf("missing %s in %v", expected, lines)
++		}
++	}
++}

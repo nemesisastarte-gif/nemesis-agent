@@ -202,12 +202,27 @@ export class TaskMessageHandler {
   }
 
   private applyErrorMessage(data: any, timestamp: number) {
+    // Les moteurs historiques renvoient error.message, tandis que le rendu
+    // attend details. Normaliser les deux formats évite un badge vide qui ne
+    // montre que le bouton « réparer/reload » sans la cause réelle.
+    const details = typeof data?.details === "string" && data.details.trim()
+      ? data.details
+      : typeof data?.error?.message === "string" && data.error.message.trim()
+        ? data.error.message
+        : typeof data?.message === "string" && data.message.trim()
+          ? data.message
+          : typeof data?.error === "string" && data.error.trim()
+            ? data.error
+            : taskDetailT("error.unknown")
     const newMessage: MessageType = {
       id: this.createMessageId(),
       time: timestamp,
       type: "error_message",
       role: "agent",
-      data,
+      data: {
+        ...(data && typeof data === "object" ? data : {}),
+        details,
+      },
     }
     this.state.messages.push(newMessage)
   }

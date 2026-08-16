@@ -39,8 +39,9 @@ default_env() {
   export MCAI_OBJECT_STORAGE_ENABLED="${MCAI_OBJECT_STORAGE_ENABLED:-true}"
   export MCAI_OBJECT_STORAGE_PROVIDER="${MCAI_OBJECT_STORAGE_PROVIDER:-local}"
   export MCAI_OBJECT_STORAGE_LOCAL_DIR="${MCAI_OBJECT_STORAGE_LOCAL_DIR:-$RUNTIME_DIR/uploads}"
-  # Le vrai moteur ohmyagent (binaire fourni séparément — protocole --stdio).
-  export MCAI_TASKFLOW_LOCAL_AGENT_BIN="${MCAI_TASKFLOW_LOCAL_AGENT_BIN:-ohmyagent}"
+  # Moteur local opencode. Une valeur explicite permet de tester le binaire
+  # baseline extrait du .deb.
+  export MCAI_TASKFLOW_LOCAL_AGENT_BIN="${MCAI_TASKFLOW_LOCAL_AGENT_BIN:-$(command -v opencode 2>/dev/null || echo /usr/share/nemesiscode/opencode)}"
   export MCAI_TASKFLOW_LOCAL_PERMISSION_MODE="${MCAI_TASKFLOW_LOCAL_PERMISSION_MODE:-yolo}"
 }
 

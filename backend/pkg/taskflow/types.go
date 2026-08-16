@@ -565,11 +565,14 @@ const (
 
 // LLM 模型配置
 type LLM struct {
-	ApiKey      string   `json:"api_key"`
-	BaseURL     string   `json:"base_url"`
-	Model       string   `json:"model"`
-	ApiType     string   `json:"api_type,omitempty"` // 接口类型 anthropic | openai
-	Temperature *float32 `json:"temperature,omitempty"`
+	ApiKey          string   `json:"api_key"`
+	BaseURL         string   `json:"base_url"`
+	Model           string   `json:"model"`
+	ApiType         string   `json:"api_type,omitempty"` // 接口类型 anthropic | openai
+	Temperature     *float32 `json:"temperature,omitempty"`
+	ThinkingEnabled bool     `json:"thinking_enabled,omitempty"`
+	ContextLimit    int      `json:"context_limit,omitempty"`
+	OutputLimit     int      `json:"output_limit,omitempty"`
 }
 
 // ConfigFile 配置文件

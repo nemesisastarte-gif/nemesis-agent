@@ -4322,6 +4322,7 @@ const en = {
       reset: "Context reset",
     },
     error: {
+      unknown: "Unknown engine error",
       details: "Error details",
       repairTip: "You can try reloading the development tool to fix the error",
       repairFailed: "Repair failed",

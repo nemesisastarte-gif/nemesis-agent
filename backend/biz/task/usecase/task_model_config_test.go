@@ -89,6 +89,14 @@ func TestModelRuntimeDefaults(t *testing.T) {
 	if outputLimit != 16000 {
 		t.Fatalf("modelRuntimeDefaults() outputLimit = %d, want 16000", outputLimit)
 	}
+
+	_, _, outputLimit = modelRuntimeDefaults(&db.Model{
+		Provider:    string(consts.ModelProviderFireworks),
+		OutputLimit: 32000,
+	})
+	if outputLimit != 8192 {
+		t.Fatalf("Fireworks outputLimit = %d, want compatibility cap 8192", outputLimit)
+	}
 }
 
 func TestGetCodingConfigsOpenCodeRendersRuntimeConfigEnabled(t *testing.T) {
@@ -133,7 +141,32 @@ func TestGetCodingConfigsOpenCodeRendersRuntimeConfigEnabled(t *testing.T) {
 	}
 }
 
-func TestGetCodingConfigsOpenCodeRendersThinkingDisabled(t *testing.T) {
+func TestGetCodingConfigsOpenCodeOmitsThinkingOptionForOpenAICompatible(t *testing.T) {
+	uc := &TaskUsecase{}
+	model := &db.Model{
+		BaseURL:         "https://api.fireworks.ai/inference/v1",
+		Model:           "accounts/fireworks/models/test-model",
+		APIKey:          "fw-test",
+		InterfaceType:   string(consts.InterfaceTypeOpenAIChat),
+		ThinkingEnabled: false,
+	}
+
+	_, cfs, _, err := uc.getCodingConfigs(context.Background(), consts.CliNameOpencode, model, nil, nil, agentresource.GlobalOnlyScope(), true)
+	if err != nil {
+		t.Fatalf("getCodingConfigs() error = %v", err)
+	}
+
+	config := opencodeConfig(t, cfs)
+	provider := opencodeProvider(t, config)
+	renderedModel := opencodeModel(t, provider, model.Model)
+	if options, ok := renderedModel["options"].(map[string]any); ok {
+		if thinking, exists := options["thinking"]; exists {
+			t.Fatalf("OpenAI-compatible thinking option = %v, want absent", thinking)
+		}
+	}
+}
+
+func TestGetCodingConfigsOpenCodeRendersAnthropicThinkingDisabled(t *testing.T) {
 	uc := &TaskUsecase{}
 	model := &db.Model{
 		BaseURL:         "https://example.com/v1",

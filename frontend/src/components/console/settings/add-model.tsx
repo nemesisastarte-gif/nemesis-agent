@@ -48,12 +48,14 @@ interface ProviderPreset {
   baseUrl: string
   interfaceType: ConstsInterfaceType
   needsToken: boolean
+  contextLimit?: number
+  outputLimit?: number
 }
 
 const PROVIDER_PRESETS: ProviderPreset[] = [
   { provider: "OpenAI", label: "OpenAI", baseUrl: "https://api.openai.com/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
   { provider: "NVIDIA", label: "NVIDIA NIM", baseUrl: "https://integrate.api.nvidia.com/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
-  { provider: "Fireworks", label: "Fireworks AI", baseUrl: "https://api.fireworks.ai/inference/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
+  { provider: "Fireworks", label: "Fireworks AI", baseUrl: "https://api.fireworks.ai/inference/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true, contextLimit: 131072, outputLimit: 8192 },
   { provider: "Cohere", label: "Cohere", baseUrl: "https://api.cohere.com/compatibility/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
   { provider: "DeepSeek", label: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
   { provider: "Moonshot", label: "Moonshot (Kimi)", baseUrl: "https://api.moonshot.cn/v1", interfaceType: ConstsInterfaceType.InterfaceTypeOpenAIChat, needsToken: true },
@@ -105,6 +107,8 @@ export default function AddModel({
     if (preset) {
       setBaseUrl(preset.baseUrl)
       setInterfaceType(preset.interfaceType)
+      if (preset.contextLimit) setContextLimit(String(preset.contextLimit))
+      if (preset.outputLimit) setOutputLimit(String(preset.outputLimit))
       if (!preset.needsToken && !apiToken.trim()) {
         setApiToken("ollama") // local endpoints (Ollama): placeholder token
       }

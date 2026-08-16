@@ -10,6 +10,7 @@ func TestObjectStorageDefaults(t *testing.T) {
 	t.Setenv("MCAI_OBJECT_STORAGE_MAX_SIZE", "")
 	t.Setenv("MCAI_OBJECT_STORAGE_TEMP_PREFIX", "")
 	t.Setenv("MCAI_TASKFLOW_GRPC_URL", "")
+	t.Setenv("MCAI_TASKFLOW_LOCAL_AGENT_BIN", "")
 	t.Setenv("MCAI_TASK_CREATE_REQ_TTL_SECONDS", "")
 	t.Setenv("MCAI_INIT_TEAM_EXTENSION_PACKAGE_DIR", "")
 
@@ -43,6 +44,9 @@ func TestObjectStorageDefaults(t *testing.T) {
 	}
 	if cfg.TaskFlow.GrpcURL != "" {
 		t.Fatalf("taskflow.grpc_url = %q, want empty", cfg.TaskFlow.GrpcURL)
+	}
+	if cfg.TaskFlow.Local.AgentBin != "opencode" {
+		t.Fatalf("taskflow.local.agent_bin = %q, want opencode", cfg.TaskFlow.Local.AgentBin)
 	}
 	if cfg.Task.CreateReqTTLSeconds != 600 {
 		t.Fatalf("task.create_req_ttl_seconds = %d, want 600", cfg.Task.CreateReqTTLSeconds)

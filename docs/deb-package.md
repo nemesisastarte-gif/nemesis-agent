@@ -9,10 +9,16 @@ tourner NemesisCode sur un PC Linux 64 bits, **sans rien installer d'autre** :
 - base de données SQLite (fichier), Redis intégré en mémoire, stockage
   fichier local — **aucun service externe**.
 
-## Installation
+## Téléchargement et installation
+
+Le paquet courant est conservé dans `releases/v1.2.3/` et référencé par la
+page **GitHub Releases**. Les anciens paquets non fonctionnels ont été retirés :
 
 ```bash
-sudo dpkg -i nemesiscode_1.0.0_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.3/releases/v1.2.3/nemesiscode_1.2.3_amd64.deb
+curl -fLO https://github.com/nemesisastarte-gif/nemesis-agent/raw/v1.2.3/releases/v1.2.3/SHA256SUMS
+sha256sum -c SHA256SUMS
+sudo dpkg -i nemesiscode_1.2.3_amd64.deb
 ```
 
 (En cas de dépendance manquante : `sudo apt-get install -f` ne sera pas
@@ -36,60 +42,31 @@ Toutes les données sont dans `~/.nemesiscode/` :
 `nemesiscode.db` (base), `workspaces/` (espaces de travail des tâches),
 `uploads/` (fichiers), `.runtime/` (logs).
 
-## Le moteur agent : opencode (embarqué dans le paquet)
+## Le moteur agent portable (embarqué dans le paquet)
 
-Le moteur d'exécution des tâches est **opencode** (https://github.com/anomalyco/opencode,
-MIT) — l'agent de codage open source qui équipe NemesisCode. Le paquet .deb
-**embarque le binaire** (`/usr/share/nemesiscode/opencode`, variante
-« baseline » compatible vieux processeurs : SSE2 suffit, aucun AVX requis) :
-**aucune installation supplémentaire**, les tâches s'exécutent dès
-`nemesiscode on`.
+Le CLI officiel récent d'opencode utilise Bun et son build « baseline »
+requiert encore SSE4.2. NemesisCode embarque à la place la dernière version
+intégralement Go d'opencode (`v0.0.52`, MIT), épinglée au commit
+`2b258b14732c9a0f50cc3552a27ebf0f68be4e53` et compilée avec
+`GOAMD64=v1`, sans SSE4.2 ni AVX.
 
-Vérification :
-
-```bash
-nemesiscode status    # doit afficher : Moteur agent (opencode) : /usr/share/nemesiscode/opencode
-nemesiscode engine    # idem, juste le chemin
-```
-
-Remplacement par un binaire plus récent (optionnel) :
+- `/usr/share/nemesiscode/opencode` : adaptateur CLI ;
+- `/usr/share/nemesiscode/opencode-portable` : moteur statique.
 
 ```bash
-# Télécharger la dernière version depuis GitHub (assets opencode-linux-x64*)
-# ou via npm : npm i opencode-ai opencode-linux-x64-baseline
-cp chemin/vers/opencode ~/.nemesiscode/opencode
-chmod +x ~/.nemesiscode/opencode
+nemesiscode engine
+nemesiscode doctor
 ```
 
-Emplacements reconnus (dans l'ordre) : `~/.nemesiscode/opencode`,
-`/usr/share/nemesiscode/opencode` (embarqué), `~/.local/bin/opencode`,
-`/usr/local/bin/opencode`, puis le `PATH`.
+Le moteur reçoit directement le modèle, l'URL, la clé, le type d'API et les
+limites configurés dans l'interface. Il prend en charge Fireworks et les API
+OpenAI-compatible, Anthropic, les outils de fichiers/shell et la reprise de
+session entre les tours.
 
-### Comment NemesisCode pilote opencode
-
-Chaque message utilisateur lance le mode non-interactif :
-
-```text
-opencode run --format json --auto [--continue] --model nemesiscode-ai/<modèle> "<message>"
-```
-
-- `--format json` : événements NDJSON sur stdout (text, tool_use, reasoning,
-  error…) → mappés vers les événements ACP du frontend (messages, outils,
-  erreurs) ;
-- `--auto` : auto-approuve les permissions (mode local « confiance ») ;
-- `--continue` : reprend la dernière session du workspace (flux « continuer
-  la tâche ») ;
-- cwd = workspace de la tâche (`~/.nemesiscode/workspaces/<tâche>/`), config
-  LLM écrite par le backend dans `<workspace>/opencode.json` (provider
-  `nemesiscode-ai` → base_url + api_key du modèle configuré dans l'UI).
-
-Le moteur appelle directement le fournisseur du modèle configuré
-(Fireworks, NVIDIA, Cohere, OpenAI-compatible, Custom…) — le réseau de la
-machine doit joindre l'API du fournisseur.
-
-Si le moteur est absent, NemesisCode affiche un avertissement au démarrage
-mais continue : la configuration des modèles et la création de tâches
-fonctionnent.
+Les fragments de réponse sont envoyés au navigateur dès leur réception. Les
+appels d'outils apparaissent avec leur état, leurs paramètres et leur résultat ;
+les fragments de raisonnement sont également transmis lorsque le modèle et
+l'interface configurés les fournissent.
 
 ## Changement de port
 
@@ -112,7 +89,7 @@ manuellement si vous voulez tout effacer).
 
 ```bash
 scripts/build-deb.sh          # depuis la racine du dépôt
-# Produit : dist-deb/nemesiscode_1.0.0_amd64.deb
+# Produit : dist-deb/nemesiscode_1.2.3_amd64.deb
 ```
 
 Prérequis : Go 1.25+, Node 22+, pnpm, dpkg-deb. Le binaire est compilé avec
